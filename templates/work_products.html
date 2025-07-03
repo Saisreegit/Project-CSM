@@ -1,0 +1,14 @@
+<!DOCTYPE html><html><head>
+  <title>Work Products</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head><body>
+<h2>Work Products – Project {{ project_id }}</h2>
+<div class="grid">
+  <a class="nav-btn" href="{{ url_for('crms_bp.crms_index') }}" class="btn">CRMS</a>
+  <a class="nav-btn" href="#">FSRM ➜</a>
+  <a class="nav-btn" href="{{ url_for('safe_ops_bp.show_products')}}">Safe Ops ➜</a>
+  <a class="nav-btn" href="#">Evi Learn ➜</a>
+  <a class="nav-btn" href="{{ url_for('index') }}">Upload Here ➜</a>
+</div>
+<a class="link" href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+</body></html>

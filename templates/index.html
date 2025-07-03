@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chip Safety Manager</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #e3f2fd, #f0f7ff);
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 30px;
+      background: #ffffff;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      border: 2px solid #d0e7ff;
+    }
+
+    h2 {
+      color: #ece1e1;
+      margin-bottom: 20px;
+      background: linear-gradient(to right, #48c6ef, #6bace2);
+      -webkit-text-fill-color: #000000;
+      font-size: 28px;
+    }
+
+    input[type="file"] {
+      margin: 15px 0;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    button {
+      padding: 10px 18px;
+      margin: 10px 6px;
+      background: linear-gradient(to right, #007bff, #00c6ff);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.3s ease, transform 0.2s;
+    }
+
+    button:hover {
+      background: linear-gradient(to right, #0056b3, #00a8cc);
+      transform: scale(1.05);
+    }
+
+    #sheetControls {
+      margin-top: 20px;
+    }
+
+    label {
+      margin-right: 10px;
+      font-weight: bold;
+      color: #1c2833;
+    }
+
+    select {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #bbb;
+      background: #f0f8ff;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 25px;
+      table-layout: fixed;
+      border: 1px solid #ccddee;
+    }
+
+    th, td {
+      border: 1px solid #e0ecff;
+      padding: 10px;
+      text-align: left;
+      background-color: #fcfdff;
+      word-wrap: break-word;
+    }
+
+    th {
+      background: linear-gradient(to right, #d0eaff, #f0faff);
+      color: #154360;
+    }
+
+    td input[type="text"], td select {
+      width: 100%;
+      padding: 6px;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    td input[type="text"]:focus, td select:focus {
+      outline: none;
+      background-color: #e9f7fe;
+    }
+
+    td select {
+      background-color: #ebf5ff;
+      border-radius: 3px;
+    }
+
+    td input[readonly] {
+      background-color: #f0f3f4;
+      color: #333;
+      font-weight: bold;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 20px;
+        width: 95%;
+      }
+
+      table, th, td {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Chip Safety Manager</h2>
+    <form id="uploadForm">
+      <input type="file" id="fileInput" accept=".xlsx, .xls" required />
+      <button type="submit">Upload</button>
+    </form>
+
+    <div id="sheetControls" style="display:none;">
+      <label for="sheetSelector">Select Sheet:</label>
+      <select id="sheetSelector" onchange="loadSheet()"></select>
+      <button onclick="saveSheet()">Save Sheet</button>
+      <button onclick="downloadExcel()">Download File</button>
+    </div>
+
+    <div id="editor"></div>
+  </div>
+
+  <script>
+    let fileName = "", currentSheet = "", currentData = [], currentDropdowns = {};
+
+    document.getElementById("uploadForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const file = document.getElementById("fileInput").files[0];
+      const formData = new FormData();
+      formData.append("file", file);
+
+      fetch("/upload", { method: "POST", body: formData })
+        .then(res => res.json())
+        .then(data => {
+          fileName = data.filename;
+          const selector = document.getElementById("sheetSelector");
+          selector.innerHTML = "";
+
+          data.sheets.forEach(sheet => {
+            const opt = document.createElement("option");
+            opt.value = sheet;
+            opt.textContent = sheet;
+            selector.appendChild(opt);
+          });
+
+          document.getElementById("sheetControls").style.display = "block";
+          selector.selectedIndex = 0;
+          loadSheet();
+        });
+    });
+
+    function loadSheet() {
+      const sheet = document.getElementById("sheetSelector").value;
+      currentSheet = sheet;
+
+      fetch(`/edit?filename=${fileName}&sheet=${sheet}`)
+        .then(res => res.json())
+        .then(data => {
+          currentData = data.data;
+          currentDropdowns = data.dropdowns || {};
+          renderTable(data.columns, data.data);
+        });
+    }
+
+    function renderTable(columns, data) {
+      let html = "<table><tr>";
+      columns.forEach(col => html += `<th>${col}</th>`);
+      html += "</tr>";
+
+      data.forEach((row, rowIndex) => {
+        html += "<tr>";
+        columns.forEach((col, colIndex) => {
+          const val = row[col] || "";
+          const coord = String.fromCharCode(65 + colIndex) + (rowIndex + 2);
+
+          if (colIndex === 0) {
+            html += `<td><input type="text" value="${val}" readonly /></td>`;
+          } else if (currentDropdowns[coord]) {
+            html += `<td><select onchange="updateCell(${rowIndex}, '${col}', this.value)">`;
+            currentDropdowns[coord].forEach(option => {
+              const selected = option === val ? "selected" : "";
+              html += `<option value="${option}" ${selected}>${option}</option>`;
+            });
+            html += "</select></td>";
+          } else {
+            html += `<td><input type="text" value="${val}" oninput="updateCell(${rowIndex}, '${col}', this.value)" /></td>`;
+          }
+        });
+        html += "</tr>";
+      });
+
+      html += "</table>";
+      document.getElementById("editor").innerHTML = html;
+    }
+
+    function updateCell(row, col, value) {
+      currentData[row][col] = value;
+    }
+
+    function saveSheet() {
+      fetch("/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: fileName, sheet: currentSheet, data: currentData })
+      })
+        .then(res => res.json())
+        .then(data => alert(data.message));
+    }
+
+    function downloadExcel() {
+      const name = prompt("Enter filename:", "Edited_File.xlsx");
+      if (name) window.location.href = `/download?filename=${fileName}&custom_name=${name}`;
+    }
+  </script>
+</body>
+</html>

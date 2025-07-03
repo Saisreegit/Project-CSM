@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h2>Welcome, {{ username }}!</h2>
+  <p>You are logged in as <strong>{{ role }}</strong></p>
+
+  {% if projects %}
+    <div class="grid">
+      {% for pid, pname in projects %}
+        <a class="nav-btn" href="{{ url_for('work_products', project_id=pid) }}">
+          {{ pname }} ➜
+        </a>
+      {% endfor %}
+
+      {% if role == 'admin' %}
+        <a class="nav-btn add-btn" href="{{ url_for('add_project') }}">
+          ➕ Add Project
+        </a>
+      {% endif %}
+    </div>
+  {% else %}
+    <p>No projects available.</p>
+  {% endif %}
+
+  <a class="link" href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>

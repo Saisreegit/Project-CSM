@@ -1,0 +1,21 @@
+<!-- templates/add_project.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add New Project</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h2>Add New Project</h2>
+        <form method="POST">
+            <label for="project_name">Project Name (optional):</label>
+            <input type="text" name="project_name" id="project_name" placeholder="Enter custom name">
+            <button type="submit">Add Project</button>
+        </form>
+        <br>
+        <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+    </div>
+</body>
+</html>
