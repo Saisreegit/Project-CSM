@@ -9,8 +9,9 @@ import io
 from sqlalchemy.dialects.mysql import MEDIUMBLOB
 import re
 from dotenv import load_dotenv
+from . import crms_bp
 
-
+crms_bp = Blueprint('crms', __name__, template_folder='templates', static_folder='static')
 
 load_dotenv()
 app = Flask(__name__)
@@ -113,12 +114,12 @@ class ChangeRequest(db.Model):
     
 # Embedded HTML template for the select page
 
-@app.route('/', methods=['GET'])
+@crms_bp.route('/')
 def index():
     return render_template("select_template.html")
 
 
-@app.route('/new-request', methods=['GET', 'POST'])
+@crms_bp.route('/new-request', methods=['GET', 'POST'])
 def new_request():
     change_request_id = request.args.get('change_request_id')
     saved_data = {}
@@ -180,7 +181,7 @@ def new_request():
 
 
 # New route: second page for new request filling more details
-@app.route('/new-request-step2', methods=['GET', 'POST'])
+@crms_bp.route('/new-request-step2', methods=['GET', 'POST'])
 def new_request_step2():
     cr_id = request.values.get('change_request_id')
     if not cr_id:
@@ -229,7 +230,7 @@ def new_request_step2():
                                   message=message)
 
 
-@app.route('/existing-change-request-step2', methods=['GET', 'POST'])
+@crms_bp.route('/existing-change-request-step2', methods=['GET', 'POST'])
 def existing_change_request_step2():
     cr_id = request.args.get('change_request_id')
     if not cr_id:
@@ -270,7 +271,7 @@ def existing_change_request_step2():
         message=message
     )
 # Your existing lookup and view routes below...
-@app.route('/existing-change-request', methods=['GET', 'POST'])
+@crms_bp.route('/existing-change-request', methods=['GET', 'POST'])
 def existing_change_request():
     error = None
     if request.method == 'POST':
@@ -285,7 +286,7 @@ def existing_change_request():
                 error = "Change Request ID not found."
     return render_template("existing_lookup.html", error=error)
 
-@app.route('/existing-change-request/<change_request_id>', methods=['GET', 'POST'])
+@crms_bp.route('/existing-change-request/<change_request_id>', methods=['GET', 'POST'])
 def existing_change_request_step1(change_request_id):
     cr = ChangeRequest.query.filter_by(change_request_id=change_request_id).first()
     if not cr:
@@ -314,7 +315,7 @@ def existing_change_request_step1(change_request_id):
 
     return render_template("first_template.html", saved_data=saved_data, work_products=work_products)
 
-@app.route('/', methods=['GET', 'POST'])
+@crms_bp.route('/', methods=['GET', 'POST'])
 def show_work_products():
     message = ""
     saved_data = {}
@@ -379,7 +380,7 @@ def show_work_products():
 
     return render_template("first_template.html", work_products=work_products, saved_data=saved_data, message=message)
 
-@app.route('/next', methods=['GET'])
+@crms_bp.route('/next', methods=['GET'])
 def next_step():
     cr_id = request.args.get('cr_id')
     if not cr_id:
@@ -401,7 +402,7 @@ def parse_date(value):
     return value  # You can parse date string here if needed
 
 
-@app.route('/save-next', methods=['GET', 'POST'])
+@crms_bp.route('/save-next', methods=['GET', 'POST'])
 def save_next():
     # Get change_request_id from GET query or POST form
     cr_id = request.args.get('change_request_id') or request.form.get('change_request_id')
@@ -529,7 +530,7 @@ def save_next():
         change_request=cr
     )
 
-@app.route('/download-db-file/<cr_id>')
+@crms_bp.route('/download-db-file/<cr_id>')
 def download_db_file(cr_id):
     cr = ChangeRequest.query.filter_by(change_request_id=cr_id).first_or_404()
     if cr.uploaded_file_data:
@@ -542,7 +543,7 @@ def download_db_file(cr_id):
     return "No file found in database for this record.", 404
 
 
-@app.route('/')
+@crms_bp.route('/')
 def home():
     return "Welcome to the Change Request App. Go to /next?cr_id=your_id to continue."
 
@@ -590,7 +591,7 @@ impact_analysis_fields = [
 def is_valid_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
-@app.route('/impact-analysis', methods=['GET', 'POST'])
+@crms_bp.route('/impact-analysis', methods=['GET', 'POST'])
 def impact_analysis():
     cr_id = request.form.get('change_request_id') or request.args.get('change_request_id')
     if not cr_id:
@@ -707,7 +708,7 @@ Change Management Team
 """
 
     mail.send(msg)
-@app.route('/checklist')
+@crms_bp.route('/checklist')
 def auto_checklist():
     cr_id = request.args.get('change_request_id')
     if not cr_id:
