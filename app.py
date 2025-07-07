@@ -7,7 +7,9 @@ import tempfile
 from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries
 from werkzeug.security import check_password_hash
+from crms import create_app, db
 
+app = create_app()
 app = Flask(__name__)
 init_db(app)
 CORS(app)
@@ -304,4 +306,6 @@ def download():
     return jsonify({"error": "File not found"}), 404
 
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
