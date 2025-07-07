@@ -1,0 +1,182 @@
+'''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Impact Analysis Phase</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: white;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            vertical-align: top;
+        }
+        th {
+            background-color: #007BFF;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        input[type="text"],
+        input[type="date"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        .button-container {
+            text-align: right;
+            margin-top: 20px;
+        }
+        .button-container input[type="submit"],
+        .button-container a {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .button-container .prev-button {
+            background-color: #6c757d;
+        }
+    
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Impact Analysis Phase</h2> 
+        {% if message %}
+            <div class="message">{{ message }}</div>
+        {% endif %}
+        <form id="ImpactAnalysisForm" method="POST" action="/impact-analysis">
+            <input type="hidden" name="change_request_id" value="{{ impact.change_request_id if impact else '' }}">
+            
+            <table>
+                <tr><th>#</th><th>Field Name</th><th>Input</th></tr>
+
+                <tr><td>1</td><td>Start Date</td>
+                    <td><input type="date" name="start_date" value="{{ impact.start_date or '' }}"></td></tr>
+
+                <tr><td>2</td><td>Due Date</td>
+                    <td><input type="date" name="due_date" value="{{ impact.due_date or '' }}"></td></tr>
+
+                <tr><td>3</td><td>Responsible Person</td>
+                    <td><input type="text" name="responsible_person" value="{{ impact.responsible_person or '' }}"></td></tr>
+
+                <tr><td>4</td><td>Change Severity</td>
+                    <td>
+                        <select name="change_severity">
+                            <option value="">-- Select Severity --</option>
+                            <option value="Major" {% if impact.change_severity == 'Major' %}selected{% endif %}>Major</option>
+                            <option value="Minor" {% if impact.change_severity == 'Minor' %}selected{% endif %}>Minor</option>
+                        </select>
+                    </td></tr>
+
+                <tr><td>5</td><td>Impact on Functional Safety</td>
+                    <td>
+                        <select name="impact_on_functional_safety">
+                            <option value="">-- Select Impact --</option>
+                            <option value="Yes" {% if impact.impact_on_functional_safety == 'Yes' %}selected{% endif %}>Yes</option>
+                            <option value="No" {% if impact.impact_on_functional_safety == 'No' %}selected{% endif %}>No</option>
+                        </select>
+                    </td></tr>
+
+                <tr><td>6</td><td>Justification</td>
+                    <td><textarea name="justification">{{ impact.justification or '' }}</textarea></td></tr>
+
+                <tr><td>7</td><td>Change Request Status</td>
+                    <td>
+                        <select name="change_request_status">
+                            <option value="">-- Select Status --</option>
+                            <option value="Approved" {% if impact.change_request_status == 'Approved' %}selected{% endif %}>Approved</option>
+                            <option value="Rejected" {% if impact.change_request_status == 'Rejected' %}selected{% endif %}>Rejected</option>
+                            <option value="Delayed" {% if impact.change_request_status == 'Delayed' %}selected{% endif %}>Delayed</option>
+                        </select>
+                    </td></tr>
+
+                <tr><td>8</td><td>Rationale (if Rejected/Delayed)</td>
+                    <td><textarea name="rationale_if_rejected_delay">{{ impact.rationale_if_rejected_delay or '' }}</textarea></td></tr>
+
+                <tr><td>9</td><td>Phase Status</td>
+                    <td>
+                        <select name="phase_status">
+                            <option value="">-- Select Phase Status --</option>
+                            <option value="Open" {% if impact.phase_status == 'Open' %}selected{% endif %}>Open</option>
+                            <option value="Closed" {% if impact.phase_status == 'Closed' %}selected{% endif %}>Closed</option>
+                        </select>
+                    </td></tr>
+            </table>
+
+        <!-- Email field aligned right with Send button -->
+<div style="display: flex; justify-content: flex-end; align-items: flex-end; gap: 10px; margin-bottom: 20px;">
+    <div style="text-align: right;">
+        <label for="email_id" style="font-weight: bold; display: block; margin-bottom: 6px;">Email ID(s):</label>
+        <input type="text" id="email_id" name="email_id" 
+               value="{{ impact.email_id or '' }}" 
+               placeholder="Enter comma-separated emails"
+               style="padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; width: 200px;">
+    </div>
+    <div>
+        <button type="submit" name="send_email" value="true"
+                style="padding: 8px 15px; border-radius: 5px; border: none; background-color: #17a2b8; color: white; font-weight: bold; font-size: 14px;">Send</button>
+    </div>
+</div>
+
+    <div class="button-container">
+        <a href="{{ url_for('save_next') }}?change_request_id={{ impact.change_request_id }}" class="button-style small-button">Previous</a>
+        <input type="submit" name="save_form" value="Save">
+        <input type="submit" name="next_form" value="Next">
+        <a href="{{ url_for('auto_checklist', change_request_id=impact.change_request_id) }}">
+            <button type="button" style="margin-top: 30px;">Checklist</button>
+        </a>
+    </div>
+</form>
+
+        </form>
+    </div>
+
+{% if email_sent %}
+<script>
+    window.onload = function () {
+        alert("✅ Email sent successfully to: {{ sent_to }}");
+    }
+</script>
+{% endif %}
+
+
+</body>
+</html>
+'''

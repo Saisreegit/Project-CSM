@@ -1,0 +1,9 @@
+view_existing_template = '''
+<h2>Existing Change Request: {{ cr.change_request_id }}</h2>
+<p><strong>Start Date:</strong> {{ cr.start_date }}</p>
+<p><strong>End Date:</strong> {{ cr.end_date }}</p>
+<p><strong>Phase:</strong> {{ cr.phase }}</p>
+<p><strong>Summary:</strong> {{ cr.summary_of_change }}</p>
+<a href="{{ url_for('new_request', change_request_id=cr.change_request_id) }}">Edit</a> |
+<a href="{{ url_for('existing_change_request') }}">Back to Lookup</a>
+'''

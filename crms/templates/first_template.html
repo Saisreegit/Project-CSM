@@ -1,0 +1,206 @@
+'''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Change Request Details</title>
+    <style>
+        /* Same styles as before */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: white;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background-color: white;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #007BFF;
+            color: white;
+            width: 20%;
+        }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        input[type="text"], input[type="date"], textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        .button-container {
+            text-align: right;
+            margin-top: 20px;
+        }
+        .button-container input {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            margin-left: 10px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+        }
+        .button-container input[type="submit"]:first-child {
+            background-color: #28a745;
+        }
+        .button-container input.next {
+            background-color: #007BFF;
+        }
+        .button-container input:hover {
+            opacity: 0.9;
+        }
+        .required-star {
+            color: red;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Change Request Details</h2>
+
+        {% if message %}
+            <div class="message">{{ message }}</div>
+        {% endif %}
+
+        <form id="changeRequestForm" method="POST" action="/new-request">
+            <input type="hidden" name="action" id="formAction" value="Save">
+            <input type="hidden" name="change_request_id" value="{{ saved_data['Change Request ID'] or '' }}">
+            <table>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Write</th>
+                </tr>
+                {% for wp in work_products %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ wp.name }}{% if wp.name != "Summary of Change" %}<span class="required-star">*</span>{% endif %}</td>
+                    <td>
+                        {% set val = saved_data.get(wp.name, '') %}
+                        {% if wp.input_type == 'textarea' %}
+                            <textarea name="value{{ loop.index }}">{{ val }}</textarea>
+                        {% elif wp.input_type == 'select' %}
+                            <select name="value{{ loop.index }}" {% if wp.name != 'Summary of Change' %}required{% endif %}>
+                                <option value="">-- Select Phase --</option>
+                                {% for option in wp.options %}
+                                    <option value="{{ option }}" {% if option == val %}selected{% endif %}>{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        {% else %}
+                            <input type="{{ wp.input_type }}" 
+                                   name="value{{ loop.index }}"
+                                   id="{% if wp.name.lower().startswith('start date') %}start_date{% elif wp.name.lower().startswith('end date') %}end_date{% endif %}"
+                                   value="{{ val }}"
+                                   {% if wp.name != 'Summary of Change' %}required{% endif %}>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <div class="button-container">
+                <input type="submit" value="Save" onclick="submitForm('Save')">
+                <input type="button" value="Next" class="next" onclick="submitFormWithoutValidation()">
+                <a href="{{ url_for('auto_checklist', change_request_id=saved_data['Change Request ID']) }}">
+                    <input type="button" value="Checklist" style="background-color: #6c757d;" />
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        function submitForm(actionType) {
+            document.getElementById('formAction').value = actionType;
+            document.getElementById('changeRequestForm').submit();
+        }
+
+        function submitFormWithoutValidation() {
+            const form = document.getElementById('changeRequestForm');
+            const inputs = form.querySelectorAll('input, select, textarea');
+            let valid = true;
+
+            for (let input of inputs) {
+                const label = input.closest('td')?.previousElementSibling?.textContent || '';
+                if (label.includes('Summary of Change')) continue;
+
+                if (input.type !== "submit" && input.type !== "button" && input.type !== "hidden" && !input.value.trim()) {
+                    input.style.border = "2px solid red";
+                    valid = false;
+                } else {
+                    input.style.border = "";
+                }
+            }
+
+            if (valid) {
+                document.getElementById('formAction').value = 'Next';
+                form.submit();
+            } else {
+                alert("Please fill in all required fields before proceeding to the next step.");
+            }
+        }
+
+        // Enable/disable end date based on start date
+        window.addEventListener('DOMContentLoaded', function () {
+            const startDateInput = document.getElementById('start_date');
+            const endDateInput = document.getElementById('end_date');
+
+            function updateEndDateState() {
+                const startDate = startDateInput?.value;
+                if (startDate) {
+                    endDateInput.disabled = false;
+                    endDateInput.min = startDate;
+                    if (endDateInput.value && endDateInput.value < startDate) {
+                        endDateInput.value = '';
+                    }
+                } else {
+                    endDateInput.disabled = true;
+                    endDateInput.value = '';
+                    endDateInput.removeAttribute('min');
+                }
+            }
+
+            if (startDateInput && endDateInput) {
+                startDateInput.addEventListener('change', updateEndDateState);
+                updateEndDateState();
+            }
+        });
+    </script>
+</body>
+
+</html>
+'''

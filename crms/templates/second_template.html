@@ -1,0 +1,421 @@
+'''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Change Request Description Phase</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background-color: white; 
+            padding: 40px 20px; 
+        }
+        .container {
+            max-width: 1100px;
+            margin: auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.1);
+            position: relative; /* allow absolute positioning inside */
+        }
+        h2 { text-align: center; margin-bottom: 25px; color: #333; }
+        .message { 
+            background-color: #d4edda; 
+            color: #155724; 
+            padding: 12px; 
+            border: 1px solid #c3e6cb; 
+            border-radius: 5px; 
+            margin-bottom: 20px; 
+            text-align: center; 
+        }
+
+        .table-wrapper {
+            display: flex;
+        }
+
+        table {
+            width: 700px;
+            border-collapse: collapse;
+            float: left;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            vertical-align: top;
+        }
+
+        th {
+            background-color: #007BFF;
+            color: white;
+            width: 30%;
+        }
+
+        tr:nth-child(even) { background-color: #f9f9f9; }
+
+        input[type="text"], textarea, select, input[type="email"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+        }
+
+        textarea { height: 100px; resize: vertical; }
+
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            padding: 4px 0;
+        }
+
+
+        .right-section {
+            width: 25%;
+            float: right;
+            text-align: right;
+        }
+        .right-section input[type="email"], 
+        .right-section input[type="file"] {
+            width: 90%;
+            margin-bottom: 10px;
+        }
+        .button-group {
+            margin-top: 20px;
+            float: right;
+        }
+        .button-group input {
+            padding: 10px 15px;
+            margin-left: 10px;
+        }
+        .clearfix::after {
+            content: "";
+            display: table;
+            clear: both;
+        }
+
+        .email-container {
+            text-align: right;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+        }
+
+        .email-container input[type="email"] { width: 300px; }
+
+        .email-container button {
+            background-color: #17a2b8;
+            color: white;
+            padding: 10px 20px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        /* Browse button fixed to right middle area */
+.file-upload {
+    position: absolute;
+    top: 210px;         /* Adjust to align vertically */
+    right: 40px;        /* Controls how far from the right edge */
+    display: flex;
+    flex-direction: column;
+    background-color: #f8f8f8;
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    z-index: 10;
+}
+        .file-upload label {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .form-controls {
+    margin-top: 40px;
+    text-align: right;
+}
+
+.form-controls textarea {
+    width: 300px;
+    height: 60px;
+    padding: 10px;
+    resize: none;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.button-container {
+    margin-top: 15px;
+}
+
+.button-container input[type="submit"],
+.button-container input[type="button"] {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.button-container input[type="button"].next {
+    background-color: #007BFF;
+}
+
+.button-container input[type="button"].prev-button {
+    background-color: #6c757d;
+}
+
+.button-container input:hover {
+    opacity: 0.9;
+}
+
+.file-upload {
+    margin-bottom: 1rem;
+  }
+
+  .file-upload input[type="file"] {
+    width: 300px; /* or any width you prefer */
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .file-upload p {
+    margin-bottom: 0.5rem;
+    font-size: 14px;
+  }
+
+  .file-upload label {
+    display: inline-block;
+    margin-bottom: 0.25rem;
+    font-weight: bold;
+  }
+
+
+.button-style {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+}
+
+.small-button {
+    font-size: 13px;  /* Make text smaller */
+}
+
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Change Request Description Phase</h2>
+        {% if message %}
+            <div class="message">{{ message }}</div>
+        {% endif %}
+        <form id="nextForm" method="POST" action="{{ url_for('save_next') }}" enctype="multipart/form-data">
+            <input type="hidden" name="change_request_id" value="{{ change_request.change_request_id if change_request else '' }}">
+            <div class="table-wrapper">
+            <table>
+                <tr><th>#</th><th>Field Name</th><th>Input</th></tr>
+                {% for field in additional_fields %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ field.name }}</td>
+                    <td>
+                        {% set value = change_request[field.name.replace(' ', '_').lower()] if change_request else '' %}
+                        {% if field.name == 'Type of Change Request' %}
+                            <div>
+                                {% for opt in field.options %}
+                                    <label>
+                                        <input type="checkbox" name="{{ field.name }}" value="{{ opt }}"
+                                        {% if value and opt in value %}checked{% endif %}> {{ opt }}
+                                    </label><br>
+                                {% endfor %}
+                            </div>
+                        {% elif field.input_type == 'select' %}
+                            <select name="{{ field.name }}" onchange="{% if field.name == 'Change Type' %}handleChangeType(this){% endif %}">
+                                <option value="">-- Select --</option>
+                                {% for option in field.options %}
+                                    <option value="{{ option }}" {% if value == option %}selected{% endif %}>{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        {% elif field.name == 'Change Period (if Temporary)' %}
+<div id="changePeriodWrapper" style="display: block;">
+    <div id="dateInputs" style="display: block;">
+        <!-- Change Period From -->
+        <label for="change_period_from">From Date:</label>
+        <input type="date" id="change_period_from" name="change_period_from"
+               value="{{ change_request.change_period_from if change_request.change_period_from else '' }}"
+               onchange="handleFromDateChange()" />
+
+        <!-- Change Period To -->
+        <label for="change_period_to">To Date:</label>
+        <input type="date" id="change_period_to" name="change_period_to"
+               value="{{ change_request.change_period_to if change_request.change_period_to else '' }}" />
+
+    </div>
+    <div id="naText" style="display: none;"><strong>N/A</strong></div>
+</div>
+                        {% elif field.input_type == 'text' %}
+                            <input type="text" name="{{ field.name }}" value="{{ value or '' }}">
+                        {% elif field.input_type == 'textarea' %}
+                            <textarea name="{{ field.name }}">{{ value or '' }}</textarea>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div> 
+        <!-- Controls below form table -->
+<!-- Updated placement of bottom controls -->
+<div class="bottom-controls" style="display: flex; flex-direction: column; align-items: flex-end; margin-top: 30px;">
+    <!-- Horizontal email input and send button -->
+<div style="display: flex; align-items: center; margin-top: 30px; gap: 10px;">
+    <label for="email" style="white-space: nowrap;">Enter Email ID:</label>
+    <textarea name="email" id="email" rows="2"
+        style="height: 50px; width: 200px; padding: 5px; box-sizing: border-box; resize: none;"
+        placeholder="example1@example.com&#10;example2@example.com">{{ change_request.email_ids or  '' }}</textarea>
+    <button type="submit" name="send_email"
+        style="background-color: #17a2b8; color: white; padding: 8px 15px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
+        Send
+    </button>
+</div>
+
+
+    <div class="button-container" style="margin-top: 15px;">
+        <a href="{{ url_for('new_request') }}?change_request_id={{ change_request.change_request_id }}" class="button-style small-button">Previous</a>
+
+
+
+
+        <input type="submit" value="Save" name="save_form" style="background-color: #28a745;">
+        <input type="submit" value="Next" name="next_form" style="background-color: #007bff; color: white;">
+
+    </div>
+</div>
+
+
+
+     <div class="file-upload">
+    {% if change_request.uploaded_file_name %}
+        <p style="font-size: 13px;">
+            {{ change_request.uploaded_file_name }}
+            (<a href="{{ url_for('download_db_file', cr_id=change_request.change_request_id) }}" target="_blank">Download</a>)
+        </p>
+    {% endif %}
+
+    <label for="file">Browse:</label>
+    <input type="file" name="file" id="fileInput">
+</div>
+
+
+             
+        </form>
+    </div>
+
+    <script>
+
+        document.getElementById("nextForm").addEventListener("submit", function (e) {
+            const emailField = document.getElementById("email");
+            const emails = emailField.value.split(",");
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            for (let email of emails) {
+                const trimmed = email.trim();
+                if (trimmed && !emailPattern.test(trimmed)) {
+                    alert("Invalid email format: " + trimmed);
+                    e.preventDefault();
+                    return false;
+                }
+            }
+        });
+
+     
+    function handleChangeType(selectElement) {
+        const wrapper = document.getElementById("changePeriodWrapper");
+        const fromDate = document.getElementById("change_period_from");
+        const toDate = document.getElementById("change_period_to");
+        const dateInputs = document.getElementById("dateInputs");
+        const naText = document.getElementById("naText");
+
+        if (selectElement.value === "Temporary") {
+            wrapper.classList.remove("hidden");
+            dateInputs.style.display = "block";
+            naText.style.display = "none";
+            fromDate.disabled = false;
+
+            // Only enable toDate if fromDate is already selected
+            if (fromDate.value) {
+                toDate.disabled = false;
+                toDate.min = fromDate.value;
+            } else {
+                toDate.disabled = true;
+                toDate.value = "";
+                toDate.removeAttribute("min");
+            }
+
+        } else if (selectElement.value === "Permanent") {
+            wrapper.classList.remove("hidden");
+            dateInputs.style.display = "none";
+            naText.style.display = "block";
+            fromDate.disabled = true;
+            toDate.disabled = true;
+            fromDate.value = "";
+            toDate.value = "";
+        } else {
+            wrapper.classList.add("hidden");
+            dateInputs.style.display = "none";
+            naText.style.display = "none";
+            fromDate.disabled = true;
+            toDate.disabled = true;
+            fromDate.value = "";
+            toDate.value = "";
+        }
+    }
+
+    function handleFromDateChange() {
+        const fromDate = document.getElementById("change_period_from");
+        const toDate = document.getElementById("change_period_to");
+
+        if (fromDate.value) {
+            toDate.disabled = false;
+            toDate.min = fromDate.value;
+
+            if (toDate.value && toDate.value < fromDate.value) {
+                toDate.value = '';
+            }
+        } else {
+            toDate.disabled = true;
+            toDate.value = '';
+            toDate.removeAttribute('min');
+        }
+    }
+
+    // Run both on page load
+    window.onload = function () {
+        const changeType = document.getElementById("changeType");
+        const fromDate = document.getElementById("change_period_from");
+
+        if (changeType) handleChangeType(changeType);
+        if (fromDate) handleFromDateChange();
+    };
+
+    </script>
+</body>
+
+</html>
+'''
