@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}User Dashboard{% endblock %}
+
+{% block content %}
+<div class="header-controls">
+    <h1>User Dashboard</h1>
+    <a class="button" href="{{ url_for('logout') }}">Logout</a>
+</div>
+<p>Welcome, {{ username }}! Here are your training sessions.</p>
+
+<h2>My Trainings:</h2>
+{% if trainings_status %}
+<ul>
+    {% for training in trainings_status %}
+    <li class="user-training-card">
+        <h3>{{ training.title }}</h3>
+        <p>Progress:</p>
+        <div class="progress-bar">
+            <div class="progress-bar-fill" style="width: {{ training.completion_percentage }}%;">
+                {{ training.completion_percentage }}%
+            </div>
+        </div>
+        <p>Status: 
+            {% if training.is_completed %}
+                <span class="completion-status">Completed! ✅</span>
+            {% else %}
+                <span class="completion-status not-completed">In Progress</span>
+            {% endif %}
+        </p>
+        <a class="button" href="{{ url_for('user.user_training_details', training_title=training.title) }}">View Details</a>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>No training sessions available yet.</p>
+{% endif %}
+
+<h2 class="user-certificates-section">My Certificates:</h2>
+{% if user_certificates %}
+<ul class="certificate-list">
+    {% for cert in user_certificates %}
+    <li class="certificate-item">
+        <div class="cert-icon">📜</div>
+        <h3>{{ cert.training_title }}</h3>
+        <p>Completed on: {{ cert.completion_date }}</p>
+        <a class="button" href="{{ url_for('user.user_view_certificate', certificate_id=cert.certificate_id) }}">View Certificate</a>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>You have not earned any certificates yet.</p>
+{% endif %}
+{% endblock %}

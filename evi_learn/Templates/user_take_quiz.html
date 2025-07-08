@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Take Quiz{% endblock %}
+
+{% block content %}
+<div class="header-controls">
+    <h1>Take Quiz for: {{ training_title }} - Video: {{ video_info.display_name }}</h1>
+    <a class="button" href="{{ url_for('user.user_training_details', training_title=training_title) }}">Back to Video</a>
+</div>
+
+<div class="quiz-question-card">
+    <h2>Question {{ quiz_index + 1 }}: {{ quiz.question }}</h2>
+    <form method="post" action="{{ url_for('user.user_take_quiz', training_title=training_title, video_filename=video_filename, quiz_index=quiz_index) }}">
+        {% if quiz.type == 'single_mcq' %}
+            <div class="options">
+                {% for option in quiz.options %}
+                    <div>
+                        <input type="radio" id="option{{ loop.index0 }}" name="answer" value="{{ loop.index0 }}" required>
+                        <label for="option{{ loop.index0 }}">{{ option }}</label>
+                    </div>
+                {% endfor %}
+            </div>
+        {% elif quiz.type == 'multiple_mcq' %}
+            <div class="options">
+                <p>Select all correct options:</p>
+                {% for option in quiz.options %}
+                    <div>
+                        <input type="checkbox" id="option{{ loop.index0 }}" name="answers" value="{{ loop.index0 }}">
+                        <label for="option{{ loop.index0 }}">{{ option }}</label>
+                    </div>
+                {% endfor %}
+            </div>
+        {% elif quiz.type == 'paragraph' %}
+            <label for="answer_text">Your Answer:</label>
+            <textarea id="answer_text" name="answer_text" rows="6" required></textarea>
+        {% endif %}
+        <button type="submit" class="button">Submit Answer</button>
+    </form>
+    {% if previous_score is not none %}
+        <p style="margin-top: 15px;">Your previous score for this quiz: <strong>{{ previous_score }}%</strong></p>
+    {% endif %}
+</div>
+{% endblock %}

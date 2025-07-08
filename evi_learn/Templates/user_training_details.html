@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}User: {{ training_title }} Details{% endblock %}
+
+{% block content %}
+<div class="header-controls">
+    <h1>Training: {{ training_title }}</h1>
+    <a class="button" href="{{ url_for('user.user_dashboard') }}">Back to Dashboard</a>
+</div>
+
+<h2>Videos:</h2>
+{% if videos %}
+<ul class="video-list-section">
+    {% for video in videos %}
+    <li class="video-item">
+        <h3>{{ video.display_name }}</h3>
+        <div class="video-player-section">
+            <video controls>
+                <source src="{{ url_for('user.uploaded_file_user', folder_name=training_data.folder_name, filename=video.actual_filename) }}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <p>Status: 
+            {% if video.is_watched %}
+                <strong>Watched ✅</strong>
+            {% else %}
+                <a class="button action-button" href="{{ url_for('user.user_mark_watched', training_title=training_title, video_filename=video.actual_filename) }}">Mark as Watched</a>
+            {% endif %}
+        </p>
+        
+        <h4>Quizzes for this video:</h4>
+        {% if video.quizzes %}
+        <ul>
+            {% for quiz in video.quizzes %}
+            <li>
+                <p><strong>Q{{ loop.index }}:</strong> {{ quiz.question }}</p>
+                <p>Your Score: 
+                    {% if quiz.score is not none %}
+                        {{ quiz.score }}% 
+                        {% if quiz.passed %} (Passed) ✅
+                        {% else %} (Failed) ❌
+                        {% endif %}
+                    {% else %}
+                        Not attempted
+                    {% endif %}
+                </p>
+                <a class="button action-button" href="{{ url_for('user.user_take_quiz', training_title=training_title, video_filename=video.actual_filename, quiz_index=quiz.index) }}">
+                    {% if quiz.score is not none %}Retry Quiz{% else %}Take Quiz{% endif %}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No quizzes for this video.</p>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>No videos available for this training.</p>
+{% endif %}
+{% endblock %}
