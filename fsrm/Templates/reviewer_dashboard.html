@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reviewer Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
+    <style>
+        body { margin: 20px; }
+        .container { max-width: 960px; margin: 0 auto; padding: 20px; }
+        .flash { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .flash.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .flash.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .flash.warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .doc-list { margin-top: 20px; }
+        .doc-item { border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        .doc-item.needs-re-review { border-left: 5px solid orange; }
+        .doc-item.pending { border-left: 5px solid #ffc107; } /* Warning yellow */
+        .doc-item.approved { border-left: 5px solid #28a745; } /* Success green */
+        .doc-item.rejected { border-left: 5px solid #dc3545; } /* Danger red */
+        .doc-item.under-review { border-left: 5px solid #007bff; } /* Info blue */
+        .doc-item h5 { margin-top: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Reviewer Dashboard</h1>
+        <p>Logged in as: <strong>{{ reviewer_email }}</strong></p>
+        <p><a href="{{ url_for('index') }}">Go to Home (select role)</a> | <a href="{{ url_for('owner_dashboard', email=reviewer_email) }}">View as Owner</a> | <a href="{{ url_for('view_audit_log') }}">View Audit Log</a></p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <h3>Documents Assigned to You</h3>
+        {% if reviewer_docs %}
+            <div class="doc-list">
+                {% for doc_id, doc in reviewer_docs.items() %}
+                    <div class="doc-item {{ doc['status'].lower().replace(' ', '-') }} {% if doc['needs_re_review'] %}needs-re-review{% endif %}">
+                        <h5>{{ doc['filename'] }} (Version: {{ doc['version'] }})</h5>
+                        <p>Owner: {{ doc['owner_name'] }} ({{ doc['owner_email'] }})</p>
+                        <p>Current Status: <strong>{{ doc['status'] }}</strong></p>
+                        {% if doc['deadline'] %}
+                            <p><strong>Deadline:</strong> {{ doc['deadline'] }}</p>
+                        {% endif %}
+                        {% if doc['needs_re_review'] %}
+                            <p style="color: orange; font-weight: bold;">This document has a new version and needs re-review!</p>
+                        {% endif %}
+                        <p>
+                            <a href="{{ url_for('document_view', doc_id=doc.doc_id, role='reviewer', email=reviewer_email) }}" class="button">Review Document</a>
+                        </p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No documents assigned to you for review.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

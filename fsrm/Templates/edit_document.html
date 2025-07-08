@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Document: {{ doc.filename }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
+    <style>
+        body { margin: 20px; }
+        .container { max-width: 960px; margin: 0 auto; padding: 20px; }
+        .flash { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .flash.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .flash.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .flash.warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        form label { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Edit Document: {{ doc.filename }} (Version: {{ doc.version }})</h1>
+        <p><a href="{{ url_for('owner_dashboard', email=current_owner_email) }}">Back to Owner Dashboard</a></p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('edit_document', doc_id=doc.doc_id, email=current_owner_email) }}" method="post" enctype="multipart/form-data">
+            <div class="row">
+                <div class="six columns">
+                    <label for="owner_name">Owner Name</label>
+                    <input class="u-full-width" type="text" id="owner_name" name="owner_name" value="{{ doc.owner_name }}" required>
+                </div>
+                <div class="six columns">
+                    <label for="owner_email">Owner Email</label>
+                    <input class="u-full-width" type="email" id="owner_email" name="owner_email" value="{{ doc.owner_email }}" required>
+                </div>
+            </div>
+            <div class="row">
+                <div class="six columns">
+                    <label for="assigned_reviewer_email">Assigned Reviewer Email</label>
+                    <input class="u-full-width" type="email" id="assigned_reviewer_email" name="assigned_reviewer_email" value="{{ doc.assigned_reviewer_email }}" required>
+                </div>
+                <div class="six columns">
+                    <label for="file">Upload New Version (Optional - leave blank to keep current file)</label>
+                    <input class="u-full-width" type="file" id="file" name="file">
+                    <small>Current file: {{ doc.filename }}</small>
+                </div>
+            </div>
+            <label for="update_reason">Reason for Update</label>
+            <textarea class="u-full-width" id="update_reason" name="update_reason" placeholder="Please provide a brief reason for this update (e.g., 'Fixed typos', 'Added new section')."></textarea>
+            <input class="button-primary" type="submit" value="Update Document">
+        </form>
+    </div>
+</body>
+</html>

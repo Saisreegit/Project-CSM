@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Review: {{ doc.filename }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
+    <style>
+        body { margin: 20px; }
+        .container { max-width: 960px; margin: 0 auto; padding: 20px; }
+        .flash { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .flash.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .flash.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .flash.warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .document-header { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .document-panels { display: flex; gap: 20px; margin-top: 20px; }
+        .document-panel { flex: 1; border: 1px solid #ddd; padding: 10px; overflow-x: auto; max-height: 800px; overflow-y: auto; }
+        .excel-table { width: 100%; border-collapse: collapse; }
+        .excel-table th, .excel-table td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; white-space: nowrap; }
+        .excel-sheet-wrapper { max-height: 500px; overflow: auto; }
+        .word-preview-content p { margin: 0 0 5px 0; padding: 2px 0; line-height: 1.4; }
+        .ppt-slide { border: 1px solid #eee; margin-bottom: 10px; padding: 10px; background: #f9f9f9; }
+        .comment-section { margin-top: 30px; }
+        .comment-item { border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        .comment-item.Open { border-left: 5px solid #dc3545; } /* Red */
+        .comment-item.In-Progress { border-left: 5px solid #ffc107; } /* Orange */
+        .comment-item.Resolved { border-left: 5px solid #28a745; } /* Green */
+        .comment-item.Closed { border-left: 5px solid #6c757d; } /* Gray */
+        .comment-item h6 { margin-top: 0; }
+        .add-comment-form, .review-submission-form, .deadline-form, .chat-form { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+        .comment-actions button, .comment-actions select { margin-right: 5px; }
+        .chat-messages { max-height: 300px; overflow-y: auto; border: 1px solid #eee; padding: 10px; margin-bottom: 10px; }
+        .chat-message { background: #f9f9f9; padding: 8px; margin-bottom: 5px; border-radius: 5px; }
+        .chat-message strong { color: #007bff; }
+        .chat-message .timestamp { float: right; font-size: 0.8em; color: #888; }
+        .chat-message .reviewer { color: #28a745; } /* Green for reviewer */
+        .chat-message .owner { color: #6f42c1; } /* Purple for owner */
+        .chat-message.system { background-color: #e2e3e5; color: #495057; }
+    </style>
+    <script>
+        function addCommentField() {
+            const container = document.getElementById('comments-container');
+            const index = container.children.length;
+            const newCommentHtml = `
+                <div class="comment-input-group" style="border: 1px dashed #ccc; padding: 10px; margin-bottom: 10px;">
+                    <h6>New Comment #${index + 1}</h6>
+                    <div class="row">
+                        <div class="six columns">
+                            <label for="comment_author_name_${index}">Your Name</label>
+                            <input class="u-full-width" type="text" id="comment_author_name_${index}" name="comments[${index}][comment_author_name]" value="{{ current_user_email.split('@')[0] if '@' in current_user_email else '' }}" required>
+                        </div>
+                        <div class="six columns">
+                            <label for="comment_author_email_${index}">Your Email</label>
+                            <input class="u-full-width" type="email" id="comment_author_email_${index}" name="comments[${index}][comment_author_email]" value="{{ current_user_email }}" required>
+                        </div>
+                    </div>
+                    {% if doc_type == 'excel' %}
+                    <div class="row">
+                        <div class="six columns">
+                            <label for="sheet_${index}">Sheet (Optional, for Excel)</label>
+                            <input class="u-full-width" type="text" id="sheet_${index}" name="comments[${index}][sheet]" placeholder="e.g., Sheet1">
+                        </div>
+                        <div class="six columns">
+                            <label for="section_page_number_${index}">Section/Page No. (Optional)</label>
+                            <input class="u-full-width" type="text" id="section_page_number_${index}" name="comments[${index}][section_page_number]" placeholder="e.g., A1, Page 3">
+                        </div>
+                    </div>
+                    {% endif %}
+                    <label for="issue_${index}">Issue/Comment</label>
+                    <textarea class="u-full-width" id="issue_${index}" name="comments[${index}][issue]" required></textarea>
+                    <div class="row">
+                        <div class="six columns">
+                            <label for="priority_${index}">Priority</label>
+                            <select class="u-full-width" id="priority_${index}" name="comments[${index}][priority]">
+                                <option value="Low">Low</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="three columns">
+                            <label for="start_date_${index}">Target Start Date (Optional)</label>
+                            <input class="u-full-width" type="date" id="start_date_${index}" name="comments[${index}][start_date]">
+                        </div>
+                        <div class="three columns">
+                            <label for="end_date_${index}">Target End Date (Optional)</label>
+                            <input class="u-full-width" type="date" id="end_date_${index}" name="comments[${index}][end_date]">
+                        </div>
+                    </div>
+                    <button type="button" onclick="this.closest('.comment-input-group').remove()" class="button button-small" style="background-color: #dc3545; color: white;">Remove Comment</button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', newCommentHtml);
+        }
+
+        // Initialize with one comment field if none exist
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.getElementById('comments-container');
+            if (container && container.children.length === 0) {
+                addCommentField();
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="document-header">
+            <h1>Document: {{ doc.filename }} (Version: {{ doc.version }})</h1>
+            <p>Owner: {{ doc.owner_name }} ({{ doc.owner_email }})</p>
+            <p>Assigned Reviewer: {{ doc.assigned_reviewer_email }}</p>
+            <p>Current Status: <strong>{{ doc.status }}</strong></p>
+            {% if doc.deadline %}
+                <p><strong>Deadline:</strong> {{ doc.deadline }}</p>
+            {% endif %}
+            <p>
+                <a href="{{ url_for('owner_dashboard', email=doc.owner_email) }}" class="button">Back to Owner Dashboard</a>
+                <a href="{{ url_for('reviewer_dashboard', email=doc.assigned_reviewer_email) }}" class="button">Back to Reviewer Dashboard</a>
+                <a href="{{ url_for('uploaded_file', filename=doc.filename) }}" download class="button button-primary">Download Current Version</a>
+            </p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <h3>Document Versions for Comparison</h3>
+        <form id="version_compare_form" method="GET" action="{{ url_for('document_view', doc_id=doc.doc_id, role=role, email=current_user_email) }}">
+            <div class="row">
+                <div class="four columns">
+                    <label for="version_a">Version A</label>
+                    <select class="u-full-width" id="version_a" name="version_a" onchange="this.form.submit()">
+                        {% for version in doc.versions | sort(attribute='version_id') %}
+                            <option value="{{ version.version_id }}" {% if version.version_id == selected_version_a %}selected{% endif %}>
+                                V{{ version.version_id }} ({{ version.timestamp.split('T')[0] }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="four columns">
+                    <label for="version_b">Version B</label>
+                    <select class="u-full-width" id="version_b" name="version_b" onchange="this.form.submit()">
+                        {% for version in doc.versions | sort(attribute='version_id', reverse=true) %}
+                            <option value="{{ version.version_id }}" {% if version.version_id == selected_version_b %}selected{% endif %}>
+                                V{{ version.version_id }} ({{ version.timestamp.split('T')[0] }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if doc_type == 'excel' %}
+                    <div class="four columns">
+                        <label for="sheet_a">Sheet A (Excel)</label>
+                        <select class="u-full-width" id="sheet_a" name="sheet_a" onchange="this.form.submit()">
+                            {% for sheet_name in sheet_names_a %}
+                                <option value="{{ sheet_name }}" {% if sheet_name == selected_sheet_a %}selected{% endif %}>{{ sheet_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="four columns">
+                        <label for="sheet_b">Sheet B (Excel)</label>
+                        <select class="u-full-width" id="sheet_b" name="sheet_b" onchange="this.form.submit()">
+                            {% for sheet_name in sheet_names_b %}
+                                <option value="{{ sheet_name }}" {% if sheet_name == selected_sheet_b %}selected{% endif %}>{{ sheet_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
+            </div>
+            <input type="hidden" name="role" value="{{ role }}">
+            <input type="hidden" name="email" value="{{ current_user_email }}">
+        </form>
+
+        <div class="document-panels">
+            <div class="document-panel">
+                <h4>Version A Content</h4>
+                {{ left_panel_html | safe }}
+            </div>
+            <div class="document-panel">
+                <h4>Version B Content {% if comparison_mode %}(Differences Highlighted){% endif %}</h4>
+                {{ right_panel_html | safe }}
+            </div>
+        </div>
+
+        <div class="comment-section">
+            <h2>Comments & Review</h2>
+
+            {% if role == 'reviewer' %}
+            <div class="deadline-form">
+                <h3>Set Review Deadline</h3>
+                <form action="{{ url_for('set_deadline', doc_id=doc.doc_id, role=role, email=current_user_email) }}" method="POST">
+                    <label for="deadline">Deadline Date</label>
+                    <input type="date" id="deadline" name="deadline" value="{{ doc.deadline }}">
+                    <input type="submit" value="Set Deadline" class="button-primary">
+                </form>
+            </div>
+            {% endif %}
+
+            <div class="add-comment-form">
+                <h3>Add New Comment(s)</h3>
+                <form action="{{ url_for('add_comment', doc_id=doc.doc_id, role=role, email=current_user_email) }}" method="post">
+                    <div id="comments-container">
+                        </div>
+                    <button type="button" onclick="addCommentField()" class="button">Add Another Comment</button>
+                    <input class="button-primary" type="submit" value="Submit Comment(s)">
+                </form>
+            </div>
+
+            <h3>Existing Comments ({{ doc.comments | length }})</h3>
+            {% if doc.comments %}
+                <div class="comment-list">
+                    {% for comment in doc.comments | sort(attribute='timestamp', reverse=true) %}
+                        <div class="comment-item {{ comment.status.replace(' ', '-') }}">
+                            <h6>Comment #{{ comment.comment_id }} - Status: <strong>{{ comment.status }}</strong></h6>
+                            <p><strong>By:</strong> {{ comment.comment_author_name }} ({{ comment.comment_author_email }}) on {{ comment.timestamp }}</p>
+                            {% if comment.sheet %}
+                                <p><strong>Sheet:</strong> {{ comment.sheet }}</p>
+                            {% endif %}
+                            {% if comment.section_page_number %}
+                                <p><strong>Section/Page:</strong> {{ comment.section_page_number }}</p>
+                            {% endif %}
+                            <p><strong>Issue:</strong> {{ comment.issue }}</p>
+                            <p><strong>Priority:</strong> {{ comment.priority }}</p>
+                            {% if comment.start_date %}
+                                <p><strong>Target Dates:</strong> {{ comment.start_date }} to {{ comment.end_date }}</p>
+                            {% endif %}
+                            {% if comment.actual_start_date %}
+                                <p><strong>Actual Dates:</strong> {{ comment.actual_start_date }} to {{ comment.actual_end_date if comment.actual_end_date else 'In Progress' }}</p>
+                            {% endif %}
+
+                            {% if role == 'reviewer' or role == 'owner' %}
+                            <div class="comment-actions">
+                                <form action="{{ url_for('update_comment_status', doc_id=doc.doc_id, comment_id=comment.comment_id, role=role, email=current_user_email) }}" method="post" style="display:inline-block;">
+                                    <label for="status_{{ comment.comment_id }}">Change Status:</label>
+                                    <select id="status_{{ comment.comment_id }}" name="status" onchange="this.form.submit()">
+                                        <option value="Open" {% if comment.status == 'Open' %}selected{% endif %}>Open</option>
+                                        <option value="In Progress" {% if comment.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                        <option value="Resolved" {% if comment.status == 'Resolved' %}selected{% endif %}>Resolved</option>
+                                        <option value="Closed" {% if comment.status == 'Closed' %}selected{% endif %}>Closed</option>
+                                    </select>
+                                    <input type="hidden" name="actual_start_date" value="{{ comment.actual_start_date }}">
+                                    <input type="hidden" name="actual_end_date" value="{{ comment.actual_end_date }}">
+                                </form>
+                                {% if current_user_email == comment.comment_author_email or current_user_email == doc.owner_email or current_user_email == doc.assigned_reviewer_email %}
+                                <form action="{{ url_for('delete_comment', doc_id=doc.doc_id, comment_id=comment.comment_id, role=role, email=current_user_email) }}" method="post" style="display:inline-block; margin-left: 10px;" onsubmit="return confirm('Are you sure you want to delete this comment?');">
+                                    <button type="submit" class="button button-small" style="background-color: #dc3545; color: white;">Delete</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>No comments yet for this document.</p>
+            {% endif %}
+        </div>
+
+        {% if role == 'reviewer' %}
+            <div class="review-submission-form">
+                <h3>Submit Final Review Status</h3>
+                <form action="{{ url_for('submit_review', doc_id=doc.doc_id, role=role, email=current_user_email) }}" method="post">
+                    <label for="new_status">Document Status</label>
+                    <select class="u-full-width" id="new_status" name="new_status" required>
+                        <option value="">-- Select Status --</option>
+                        {% if doc.status == 'Pending Review' %}
+                            <option value="Under Review">Under Review</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                        {% elif doc.status == 'Under Review' or doc.status == 'Needs Re-Review' or doc.status == 'Pending Re-Review (New Version)' %}
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                            <option value="Needs Re-Review">Needs Re-Review (Requires Owner Action)</option>
+                        {% endif %}
+                    </select>
+                    <label for="feedback">Overall Reviewer Feedback (Optional)</label>
+                    <textarea class="u-full-width" id="feedback" name="feedback"></textarea>
+                    <input class="button-primary" type="submit" value="Submit Review">
+                </form>
+            </div>
+        {% endif %}
+
+        <div class="chat-form">
+            <h3>Document Chat</h3>
+            <div class="chat-messages">
+                {% if doc.doc_chats %}
+                    {% for chat in doc.doc_chats %}
+                        <div class="chat-message {% if chat.sender_email == doc.owner_email %}owner{% elif chat.sender_email == doc.assigned_reviewer_email %}reviewer{% else %}system{% endif %}">
+                            <span class="timestamp">{{ chat.timestamp }}</span>
+                            <strong>{{ chat.sender_name }}:</strong> {{ chat.message }}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>No chat messages yet.</p>
+                {% endif %}
+            </div>
+            <form action="{{ url_for('add_doc_chat', doc_id=doc.doc_id, role=role, email=current_user_email) }}" method="post">
+                <input type="hidden" name="sender_name" value="{% if current_user_email == doc.owner_email %}{{ doc.owner_name }}{% else %}{{ doc.assigned_reviewer_email.split('@')[0] if '@' in doc.assigned_reviewer_email else doc.assigned_reviewer_email }}{% endif %}">
+                <label for="message">Your Message</label>
+                <textarea class="u-full-width" id="message" name="message" placeholder="Type your message here..." required></textarea>
+                <input class="button-primary" type="submit" value="Send Message">
+            </form>
+        </div>
+
+    </div>
+</body>
+</html>
