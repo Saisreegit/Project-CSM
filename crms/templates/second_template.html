@@ -226,7 +226,7 @@
         {% if message %}
             <div class="message">{{ message }}</div>
         {% endif %}
-        <form id="nextForm" method="POST" action="{{ url_for('save_next') }}" enctype="multipart/form-data">
+        <form id="nextForm" method="POST" action="{{ url_for('crms_bp.save_next') }}" enctype="multipart/form-data">
             <input type="hidden" name="change_request_id" value="{{ change_request.change_request_id if change_request else '' }}">
             <div class="table-wrapper">
             <table>
@@ -297,10 +297,7 @@
 
 
     <div class="button-container" style="margin-top: 15px;">
-        <a href="{{ url_for('new_request') }}?change_request_id={{ change_request.change_request_id }}" class="button-style small-button">Previous</a>
-
-
-
+        <a href="{{ url_for('crms_bp.new_request_step2', change_request_id=change_request.change_request_id) }}"  class="button-style small-button">Previous</a>
 
         <input type="submit" value="Save" name="save_form" style="background-color: #28a745;">
         <input type="submit" value="Next" name="next_form" style="background-color: #007bff; color: white;">
@@ -314,15 +311,13 @@
     {% if change_request.uploaded_file_name %}
         <p style="font-size: 13px;">
             {{ change_request.uploaded_file_name }}
-            (<a href="{{ url_for('download_db_file', cr_id=change_request.change_request_id) }}" target="_blank">Download</a>)
+            (<a href="{{ url_for('crms_bp.download_db_file', cr_id=change_request.change_request_id) }}" target="_blank">Download</a>)
         </p>
     {% endif %}
 
     <label for="file">Browse:</label>
     <input type="file" name="file" id="fileInput">
 </div>
-
-
              
         </form>
     </div>

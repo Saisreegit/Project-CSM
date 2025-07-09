@@ -92,7 +92,7 @@
             <tr>
                 <td>New Change Request</td>
                 <td>
-                    <form action="{{ url_for('new_request') }}" method="get">
+                    <form action="{{ url_for('crms_bp.new_request') }}" method="get">
                         <button type="submit">Create New</button>
                     </form>
                 </td>
@@ -100,7 +100,7 @@
             <tr>
                 <td>Existing Change Request</td>
                 <td>
-                    <form action="{{ url_for('existing_change_request') }}" method="get">
+                    <form action="{{ url_for('crms_bp.existing_change_request') }}" method="get">
                         <button type="submit">Find Existing</button>
                     </form>
                 </td>
