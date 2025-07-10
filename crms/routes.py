@@ -1,27 +1,19 @@
-from flask import Flask, render_template_string, request, redirect, url_for, session, send_from_directory, send_file, render_template, flash
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
-from flask_mail import Mail, Message
+from flask import Blueprint, render_template, render_template_string, request, redirect, url_for, session, flash, send_file
+from flask_mail import Message
 from werkzeug.utils import secure_filename
+from datetime import datetime
 import os
-from sqlalchemy.orm import validates
 import io
-from sqlalchemy.dialects.mysql import MEDIUMBLOB
 import re
-from dotenv import load_dotenv
-from . import crms_bp
+from flask_sqlalchemy import SQLAlchemy
+from flask_mail import Mail
+from sqlalchemy.dialects.mysql import MEDIUMBLOB
+from sqlalchemy.orm import validates
+db = SQLAlchemy()
 
-crms_bp = Blueprint('crms', __name__, template_folder='templates', static_folder='static')
+mail = Mail()
 
-load_dotenv()
-app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'
-
-# MySQL Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] ='mysql+pymysql://root:root123@localhost:3307/crms_db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
+crms_bp = Blueprint('crms_bp', __name__, template_folder='templates')
 
 # Work product configuration for first page
 work_products = [
@@ -58,19 +50,9 @@ additional_fields = [
     {"name": "Phase Status", "input_type": "select", "options": ["Open", "Closed"]},
 ]
 
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
-
-mail = Mail(app)
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = None  # Allow all types
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -114,9 +96,9 @@ class ChangeRequest(db.Model):
     
 # Embedded HTML template for the select page
 
-@crms_bp.route('/')
-def index():
-    return render_template("select_template.html")
+@crms_bp.route('/index')
+def crms_index():
+    return render_template("select_template.html",)
 
 
 @crms_bp.route('/new-request', methods=['GET', 'POST'])
@@ -162,7 +144,7 @@ def new_request():
 
         if form_action == 'Next':
             # Pass the CR ID to the second step so it uses the same one
-            return redirect(url_for('new_request_step2', change_request_id=cr.change_request_id))
+            return redirect(url_for('crms_bp.new_request_step2', change_request_id=cr.change_request_id))
         elif form_action == 'Save':
             return render_template("first_template.html", saved_data=saved_data, work_products=work_products, message="Saved successfully.")
 
@@ -404,6 +386,7 @@ def parse_date(value):
 
 @crms_bp.route('/save-next', methods=['GET', 'POST'])
 def save_next():
+    # print(request.form)
     # Get change_request_id from GET query or POST form
     cr_id = request.args.get('change_request_id') or request.form.get('change_request_id')
     if not cr_id:
@@ -434,6 +417,7 @@ def save_next():
         # Parse emails list from textarea input or input field
         email_input = request.form.get('email', '')
         email_list = [e.strip() for e in email_input.replace('\n', ',').split(',') if e.strip()]
+       
 
         # If 'Send Email' button clicked but no emails, show error without saving
         if 'send_email' in request.form and not email_list:
@@ -466,6 +450,7 @@ def save_next():
 
         # Save cleaned email list back to model as comma separated string
         cr.email_ids = ', '.join(email_list)
+      
 
         # Handle file upload if new file is provided
         uploaded_file = request.files.get('file')
@@ -479,12 +464,15 @@ def save_next():
         message = "Saved successfully."
 
         # If user clicked send_email button and there are emails, send email notification
+       
         if 'send_email' in request.form and cr.email_ids:
+          
             recipients = [e.strip() for e in cr.email_ids.split(',')]
+            
             try:
                 msg = Message("Change Request Notification", recipients=recipients)
                 msg.body = f"Change Request ID: {cr.change_request_id}\n\nDetails:\n"
-
+            
                 # Include all ChangeRequest columns except file data
                 for column in cr.__table__.columns:
                     if column.name != 'uploaded_file_data':
@@ -499,10 +487,10 @@ def save_next():
                         content_type=cr.uploaded_file_type or 'application/octet-stream',
                         data=cr.uploaded_file_data
                     )
-
                 mail.send(msg)
                 message = "Saved and email sent."
             except Exception as e:
+               
                 message = f"Saved but failed to send email: {str(e)}"
 
         # Commit all DB changes after save (and maybe email)
@@ -510,7 +498,7 @@ def save_next():
 
         # Redirect to impact analysis page if 'Next' button clicked
         if 'next_form' in request.form:
-            return redirect(url_for('impact_analysis', change_request_id=cr_id))
+           return redirect(url_for('crms_bp.impact_analysis', change_request_id=cr_id))
 
         # If 'Save' button clicked, just render the second page again with message
         elif 'save_form' in request.form:
@@ -639,7 +627,7 @@ def impact_analysis():
 
         # NEW: email_id field
         impact.email_id = request.form.get('email_id', '').strip()
-
+        
 
         # Load current data
     impact_data = ImpactAnalysis.query.filter_by(change_request_id=cr_id).first()

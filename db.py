@@ -1,19 +1,21 @@
+from flask import g
+import pymysql
 import os
-from flask_mysqldb import MySQL
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+def get_db():
+    if 'db' not in g:
+        g.db = pymysql.connect(
+            host=os.getenv("MYSQL_HOST", "localhost"),
+            user=os.getenv("MYSQL_USER", "root"),
+            password=os.getenv("MYSQL_PASSWORD", ""),
+            database=os.getenv("MYSQL_DB", "chip_safety"),
+            port=int(os.getenv("MYSQL_PORT", 3306)),
+            cursorclass=pymysql.cursors.DictCursor
+        )
+    return g.db
 
-mysql = MySQL()
+def close_db(e=None):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
 
-def init_db(app):
-    app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST')
-    app.config['MYSQL_USER'] = os.getenv('MYSQL_USER')
-    app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
-    app.config['MYSQL_DB'] = os.getenv('MYSQL_DB')
-    app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT', 3306))
-
-    app.secret_key = os.getenv('SECRET_KEY')
-
-    mysql.init_app(app)
