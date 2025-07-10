@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Log</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
+    <style>
+        body { margin: 20px; }
+        .container { max-width: 960px; margin: 0 auto; padding: 20px; }
+        .log-entry { border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9; }
+        .log-entry strong { color: #007bff; }
+        .log-entry .timestamp { float: right; font-size: 0.8em; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Audit Log</h1>
+        <p><a href="{{ url_for('index') }}">Back to Home</a></p>
+        
+        {% if audit_log %}
+            <div class="log-list">
+                {% for entry in audit_log | reverse %} {# Display most recent entries first #}
+                    <div class="log-entry">
+                        <span class="timestamp">{{ entry.timestamp }}</span>
+                        <p><strong>{{ entry.entry }}</strong></p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No audit log entries yet.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

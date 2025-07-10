@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Admin2: Manage Quizzes for {{ video_info.display_name }}{% endblock %}
+
+{% block content %}
+<div class="header-controls">
+    <h1>Manage Quizzes for: {{ video_info.display_name }}</h1>
+    <a class="button" href="{{ url_for('admin2.admin2_manage_training', title=training_title) }}">Back to Training</a>
+</div>
+
+<h3>Quizzes for this video:</h3>
+{% if video_info.video_quizzes %}
+<ul>
+    {% for i, quiz in video_info.video_quizzes %}
+    <li>
+        <strong>Q{{ i+1 }}:</strong> {{ quiz.question }} <br>
+        <em>Type: {{ quiz.type.replace('_', ' ').title() }}</em> <br>
+        {% if quiz.type == 'single_mcq' %}
+            Correct Answer: Option {{ quiz.answer + 1 }}
+        {% elif quiz.type == 'multiple_mcq' %}
+            Correct Options: {{ quiz.correct_options | map('add', 1) | join(', ') }}
+        {% elif quiz.type == 'paragraph' %}
+            Correct Answer Text: '{{ quiz.correct_answer_text }}'
+        {% endif %} <br>
+        <a class="button edit-button" style="padding: 5px 10px; font-size: 0.8em;" href="#" 
+           onclick="showEditQuizForm({{ i }}, `{{ quiz.question|e }}`, `{{ quiz.type }}`, 
+                    `{{ quiz.options|tojson|e if quiz.options else '[]' }}`, 
+                    `{{ quiz.answer|e if quiz.answer is not none else '' }}`, 
+                    `{{ quiz.correct_options|tojson|e if quiz.correct_options else '[]' }}`, 
+                    `{{ quiz.correct_answer_text|e if quiz.correct_answer_text else '' }}`)">Edit</a>
+        <a class="button delete-button" style="padding: 5px 10px; font-size: 0.8em;" 
+           href="{{ url_for('admin2.admin2_delete_quiz', training_title=training_title, video_filename=video_filename, quiz_index=i) }}" 
+           onclick="return confirm('Are you sure you want to delete this quiz? This will also delete user scores for this quiz.');">Delete</a>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>No quizzes added for this video yet. Use the 'Add New Quiz' button below.</p>
+{% endif %}
+
+<div class="quiz-management-section">
+    <button class="button" onclick="showForm('add-quiz-form')">Add New Quiz</button>
+
+    <div id="add-quiz-form" class="add-quiz-form">
+        <h2>Add New Quiz</h2>
+        <form method="post">
+            <input type="hidden" name="add_quiz" value="1">
+            <label for="add_question">Question:</label><br>
+            <textarea id="add_question" name="question" rows="4" required></textarea><br>
+            
+            <label for="add_quiz_type">Quiz Type:</label><br>
+            <select id="add_quiz_type" name="quiz_type" onchange="toggleQuizOptions('add_');" required>
+                <option value="single_mcq">Single Choice MCQ</option>
+                <option value="multiple_mcq">Multiple Choice MCQ</option>
+                <option value="paragraph">Paragraph Answer</option>
+            </select><br>
+
+            <div id="add_mcq_options" class="options-container">
+                <label for="add_options">Options (one per line):</label><br>
+                <textarea id="add_options" name="options" rows="6"></textarea><br>
+                
+                <div id="add_single_mcq_answer">
+                    <label for="add_answer">Correct Option (index, starting from 0):</label><br>
+                    <input type="number" id="add_answer" name="answer" min="0"><br>
+                </div>
+                <div id="add_multiple_mcq_answers" style="display:none;">
+                    <label>Correct Options (check all that apply):</label><br>
+                    <div id="add_multiple_options_checkboxes"></div>
+                </div>
+            </div>
+            
+            <div id="add_paragraph_answer" class="options-container" style="display:none;">
+                <label for="add_correct_answer_text">Correct Answer Text:</label><br>
+                <textarea id="add_correct_answer_text" name="correct_answer_text" rows="4"></textarea><br>
+            </div>
+
+            <button type="submit">Save Quiz</button>
+            <button type="button" onclick="hideForm('add-quiz-form')">Cancel</button>
+        </form>
+    </div>
+
+    <div id="edit-quiz-form" class="edit-quiz-form">
+        <h2>Edit Quiz</h2>
+        <form method="post">
+            <input type="hidden" name="edit_quiz" value="1">
+            <input type="hidden" id="edit_quiz_index" name="quiz_index">
+            
+            <label for="edit_question">Question:</label><br>
+            <textarea id="edit_question" name="question" rows="4" required></textarea><br>
+            
+            <label for="edit_quiz_type">Quiz Type:</label><br>
+            <select id="edit_quiz_type" name="quiz_type" onchange="toggleQuizOptions('edit_');" required>
+                <option value="single_mcq">Single Choice MCQ</option>
+                <option value="multiple_mcq">Multiple Choice MCQ</option>
+                <option value="paragraph">Paragraph Answer</option>
+            </select><br>
+
+            <div id="edit_mcq_options" class="options-container">
+                <label for="edit_options">Options (one per line):</label><br>
+                <textarea id="edit_options" name="options" rows="6"></textarea><br>
+                
+                <div id="edit_single_mcq_answer">
+                    <label for="edit_answer">Correct Option (index, starting from 0):</label><br>
+                    <input type="number" id="edit_answer" name="answer" min="0"><br>
+                </div>
+                <div id="edit_multiple_mcq_answers" style="display:none;">
+                    <label>Correct Options (check all that apply):</label><br>
+                    <div id="edit_multiple_options_checkboxes"></div>
+                </div>
+            </div>
+            
+            <div id="edit_paragraph_answer" class="options-container" style="display:none;">
+                <label for="edit_correct_answer_text">Correct Answer Text:</label><br>
+                <textarea id="edit_correct_answer_text" name="correct_answer_text" rows="4"></textarea><br>
+            </div>
+
+            <button type="submit">Update Quiz</button>
+            <button type="button" onclick="hideForm('edit-quiz-form')">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function toggleQuizOptions(prefix) {
+        const quizType = document.getElementById(prefix + 'quiz_type').value;
+        document.getElementById(prefix + 'mcq_options').style.display = 'none';
+        document.getElementById(prefix + 'paragraph_answer').style.display = 'none';
+        document.getElementById(prefix + 'single_mcq_answer').style.display = 'none';
+        document.getElementById(prefix + 'multiple_mcq_answers').style.display = 'none';
+
+        if (quizType === 'single_mcq') {
+            document.getElementById(prefix + 'mcq_options').style.display = 'block';
+            document.getElementById(prefix + 'single_mcq_answer').style.display = 'block';
+        } else if (quizType === 'multiple_mcq') {
+            document.getElementById(prefix + 'mcq_options').style.display = 'block';
+            document.getElementById(prefix + 'multiple_mcq_answers').style.display = 'block';
+        } else if (quizType === 'paragraph') {
+            document.getElementById(prefix + 'paragraph_answer').style.display = 'block';
+        }
+        
+        if (quizType === 'multiple_mcq') {
+            updateMultipleChoiceCheckboxes(prefix);
+        }
+    }
+
+    function updateMultipleChoiceCheckboxes(prefix) {
+        const optionsText = document.getElementById(prefix + 'options').value;
+        const options = optionsText.split('\n').map(opt => opt.trim()).filter(opt => opt.length > 0);
+        const checkboxContainer = document.getElementById(prefix + 'multiple_options_checkboxes');
+        checkboxContainer.innerHTML = '';
+
+        options.forEach((option, index) => {
+            checkboxContainer.innerHTML += `
+                <div>
+                    <input type="checkbox" id="${prefix}correct_option_${index}" name="correct_options" value="${index}">
+                    <label for="${prefix}correct_option_${index}">${option}</label>
+                </div>
+            `;
+        });
+    }
+
+    function showEditQuizForm(index, question, type, optionsJson, answer, correctOptionsJson, correctAnswerText) {
+        document.querySelectorAll('.create-folder-form, .add-video-form, .add-quiz-form, .edit-quiz-form').forEach(form => {
+            form.classList.remove('active');
+        });
+
+        document.getElementById('edit-quiz-form').classList.add('active');
+        document.getElementById('edit_quiz_index').value = index;
+        document.getElementById('edit_question').value = question;
+        document.getElementById('edit_quiz_type').value = type;
+
+        const options = JSON.parse(optionsJson || '[]');
+        document.getElementById('edit_options').value = options.join('\n');
+
+        if (type === 'single_mcq') {
+            document.getElementById('edit_answer').value = answer;
+        } else if (type === 'multiple_mcq') {
+            const correctOptions = JSON.parse(correctOptionsJson || '[]');
+            updateMultipleChoiceCheckboxes('edit_');
+            correctOptions.forEach(idx => {
+                const checkbox = document.getElementById(`edit_correct_option_${idx}`);
+                if (checkbox) checkbox.checked = true;
+            });
+        } else if (type === 'paragraph') {
+            document.getElementById('edit_correct_answer_text').value = correctAnswerText;
+        }
+        toggleQuizOptions('edit_');
+    }
+
+    document.getElementById('add_options').addEventListener('input', () => updateMultipleChoiceCheckboxes('add_'));
+    document.getElementById('edit_options').addEventListener('input', () => updateMultipleChoiceCheckboxes('edit_'));
+
+    document.addEventListener('DOMContentLoaded', () => {
+        toggleQuizOptions('add_');
+    });
+
+</script>
+{% endblock %}

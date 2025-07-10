@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Login / Role Selection{% endblock %}
+
+{% block content %}
+<div class="header-controls">
+    <h1>Welcome to the Training Portal</h1>
+</div>
+<p>Please log in with your credentials.</p>
+
+<form method="POST" action="{{ url_for('login') }}">
+    <label for="username">Username:</label>
+    <input type="text" id="username" name="username" required><br>
+    
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" required><br>
+    
+    <button type="submit" class="button">Login</button>
+</form>
+
+<hr>
+<p>
+    <strong>Available Users:</strong><br>
+    Admin 1: `admin1_user` / `admin1pass`<br>
+    Admin 2: `admin2_user_a` / `admin2pass`<br>
+    User: `user_a` / `userpass`<br>
+</p>
+{% endblock %}

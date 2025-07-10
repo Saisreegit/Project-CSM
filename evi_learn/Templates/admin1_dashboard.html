@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Admin1 Dashboard{% endblock %}
+
+{% block content %}
+<div class="header-controls">
+    <h1>Admin1 Dashboard - All Trainings</h1>
+    <div class="create-menu-toggle" onclick="toggleDropdown('createMenu')">+</div>
+    <div id="createMenu" class="dropdown-content">
+        <a href="#" onclick="showForm('create-folder-form'); return false;">Create New Training Folder</a>
+    </div>
+    <a class="button" href="{{ url_for('logout') }}">Logout</a>
+</div>
+<p>Welcome, {{ username }}! Here is an overview of all training sessions.</p>
+
+{% if trainings %}
+<ul class="admin-training-list">
+    {% for title, training_data in trainings.items() %}
+    <li class="folder-item">
+        <a href="{{ url_for('admin1.admin1_manage_training', title=title) }}" style="text-decoration: none; color: inherit;">
+            <div class="folder-icon">📁</div>
+            <h3>{{ title }}</h3>
+            <p>Created by: {{ training_data.created_by }}</p>
+            <p>Videos: {{ training_data.num_videos }}</p>
+            <p>Users Completed: {{ training_data.users_completed }}</p>
+            <span class="button" style="margin-top: 10px;">Manage</span>
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>No training sessions created yet.</p>
+{% endif %}
+
+<div id="create-folder-form" class="create-folder-form">
+    <h2>Create New Training Folder</h2>
+    <form method="post" action="{{ url_for('admin1.admin1_create_training_folder') }}">
+        <label for="training_title">Training Title:</label>
+        <input type="text" id="training_title" name="training_title" placeholder="Training Title" required><br>
+        <button type="submit">Create Training</button>
+        <button type="button" onclick="hideForm('create-folder-form')">Cancel</button>
+    </form>
+</div>
+{% endblock %}
