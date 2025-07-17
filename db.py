@@ -14,6 +14,14 @@ def get_db():
         )
     return g.db
 
+def assign_project_to_user(project_id, user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE projects SET owner_id = %s WHERE id = %s", (user_id, project_id))
+    conn.commit()
+    cur.close()
+
+
 def close_db(e=None):
     db = g.pop('db', None)
     if db is not None:

@@ -9,32 +9,54 @@ from openpyxl.utils import range_boundaries
 from werkzeug.security import check_password_hash, generate_password_hash
 from crms.routes import crms_bp, db, mail
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# ----------------------------
+# 🔁 Load .env files
+# ----------------------------
+
+# 1. Load Project-level .env (Project-CSM/.env)
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
+
+# 2. Load CRMS-level .env (Project-CSM/crms/.env) — will override if same key exists
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / "crms" / ".env")
+
+
 
 app = Flask(__name__)
 CORS(app)
 
-app.secret_key = 'your_secret_key_here'
+app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
-#Database config
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:root123@localhost:3307/crms_db'
+
+
+# Get from .env (don't hardcode)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
+    "SQLALCHEMY_DATABASE_URI",
+    "mysql+pymysql://admin:MYSQLDB123@database-1-instance-1.ctq2goeaeevx.ap-south-1.rds.amazonaws.com/crms_db"
+)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# ----------------------------
+# ✅ Mail Configuration
+# ----------------------------
 
-#mail config
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_SERVER'] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+app.config['MAIL_PORT'] = int(os.getenv("MAIL_PORT", 587))
+app.config['MAIL_USE_TLS'] = os.getenv("MAIL_USE_TLS", "true").lower() == "true"
 app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
 app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
 app.config['MAIL_DEFAULT_SENDER'] = os.getenv("MAIL_DEFAULT_SENDER")
 
-#Initialize extensions
+# Debug (Optional)
+# print("MAIL_USERNAME:", app.config['MAIL_USERNAME'])
+# print("MAIL_DEFAULT_SENDER:", app.config['MAIL_DEFAULT_SENDER'])
+
+
 db.init_app(app)
 mail.init_app(app)
 
-#Register blueprint
+
 app.register_blueprint(crms_bp, url_prefix='/crms')
 
 # Dummy credentials (you can later link this to your DB)
@@ -141,16 +163,19 @@ def login():
 
 @app.route('/user_dashboard')
 def user_dashboard():
-    if 'username' not in session or session['role'] != 'user':
+    if 'username' not in session:
         return redirect(url_for('login'))
-    
-    projects = get_assigned_projects(session['user_id'])
 
-    return render_template(
-        'user_dashboard.html',
-        username=session['username'],
-        projects=projects              # only projects owned by this user
-    )
+    user_id = session.get('user_id')
+    print("Logged-in User ID:", session.get('user_id'))
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM projects WHERE owner_id = %s", (user_id,))
+    projects = cur.fetchall()
+    cur.close()
+
+    return render_template("user_dashboard.html", username=session['username'], projects=projects)
 
 @app.route('/dashboard')
 def dashboard():
@@ -168,6 +193,34 @@ def dashboard():
         projects=projects,             # full list
         role='admin'
     )
+
+@app.route('/assign_project', methods=['GET', 'POST'])
+def assign_project():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    if request.method == 'POST':
+        try:
+            project_id = int(request.form.get('project_id'))
+            user_id = int(request.form.get('user_id'))
+            cur.execute("UPDATE projects SET owner_id = %s WHERE id = %s", (user_id, project_id))
+            conn.commit()
+            flash("✅ Project assigned successfully!")
+        except Exception as e:
+            flash(f"❌ Error: {e}")
+
+    cur.execute("SELECT id, name FROM projects")
+    projects = cur.fetchall()
+
+    cur.execute("SELECT id, username FROM users")
+    users = cur.fetchall()
+
+    cur.close()
+    return render_template("assign_project.html", projects=projects, users=users)
+
 
 @app.route('/add_project', methods=['GET', 'POST'])
 def add_project():
