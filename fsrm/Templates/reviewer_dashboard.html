@@ -54,7 +54,7 @@
                             <p style="color: orange; font-weight: bold;">This document has a new version and needs re-review!</p>
                         {% endif %}
                         <p>
-                            <a href="{{ url_for('document_view', doc_id=doc.doc_id, role='reviewer', email=reviewer_email) }}" class="button">Review Document</a>
+                            <a href="{{ url_for('fsrm.document_view', doc_id=doc.doc_id, role='reviewer', email=reviewer_email) }}" class="button">Review Document</a>
                         </p>
                     </div>
                 {% endfor %}
