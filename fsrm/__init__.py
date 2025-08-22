@@ -1,9 +1,5 @@
 from flask import Blueprint
 
-fsrm_bp = Blueprint(
-'fsrm_bp',
-name,
-template_folder='Templates',
-static_folder='static'
-)
-from fsrm import app # This will import routes defined in fsrm/app.py
+fsrm_bp = Blueprint('fsrm', __name__, template_folder='templates', static_folder='static')
+
+from . import app  # This will import your fsrm/app.py where routes are defined

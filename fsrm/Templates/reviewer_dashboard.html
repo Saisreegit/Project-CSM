@@ -27,7 +27,7 @@
     <div class="container">
         <h1>Reviewer Dashboard</h1>
         <p>Logged in as: <strong>{{ reviewer_email }}</strong></p>
-        <p><a href="{{ url_for('index') }}">Go to Home (select role)</a> | <a href="{{ url_for('owner_dashboard', email=reviewer_email) }}">View as Owner</a> | <a href="{{ url_for('view_audit_log') }}">View Audit Log</a></p>
+        <p><a href="{{ url_for('index') }}">Go to Home (select role)</a> | <a href="{{ url_for('fsrm.owner_dashboard', email=reviewer_email) }}">View as Owner</a> | <a href="{{ url_for('fsrm.view_audit_log') }}">View Audit Log</a></p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}

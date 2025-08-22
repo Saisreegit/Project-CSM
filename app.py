@@ -8,6 +8,7 @@ from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries
 from werkzeug.security import check_password_hash, generate_password_hash
 from crms.routes import crms_bp, db, mail
+from fsrm.app import fsrm_bp
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -28,19 +29,16 @@ CORS(app)
 
 app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
-
-
 # Get from .env (don't hardcode)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
     "SQLALCHEMY_DATABASE_URI",
-    "mysql+pymysql://admin:MYSQLDB123@database-1-instance-1.ctq2goeaeevx.ap-south-1.rds.amazonaws.com/crms_db"
+    "mysql+pymysql://root:root123@localhost:3307/crms_db"
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # ----------------------------
 # ✅ Mail Configuration
 # ----------------------------
-
 app.config['MAIL_SERVER'] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
 app.config['MAIL_PORT'] = int(os.getenv("MAIL_PORT", 587))
 app.config['MAIL_USE_TLS'] = os.getenv("MAIL_USE_TLS", "true").lower() == "true"
@@ -52,12 +50,11 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv("MAIL_DEFAULT_SENDER")
 # print("MAIL_USERNAME:", app.config['MAIL_USERNAME'])
 # print("MAIL_DEFAULT_SENDER:", app.config['MAIL_DEFAULT_SENDER'])
 
-
 db.init_app(app)
 mail.init_app(app)
 
-
 app.register_blueprint(crms_bp, url_prefix='/crms')
+app.register_blueprint(fsrm_bp, url_prefix='/fsrm')
 
 # Dummy credentials (you can later link this to your DB)
 USERNAME = 'admin'
@@ -68,6 +65,13 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 excel_data = {}  # Cache for uploaded Excel files
 
 # ------------------ Helpers ---------------------------
+def get_projects_for_user(user_id):
+    cur = get_db().cursor()
+    cur.execute("SELECT id, name FROM projects WHERE assigned_user_id = %s", (user_id,))
+    result = cur.fetchall()
+    cur.close()
+    return result
+
 def get_all_projects():
     cur = get_db().cursor()
     cur.execute("SELECT id, name FROM projects ORDER BY id")
@@ -95,7 +99,6 @@ def get_assigned_projects(user_id):             # only mine
     rows = cur.fetchall()
     cur.close()
     return rows
-
 
 @app.route('/')
 def home():
@@ -133,7 +136,6 @@ def register():
         return redirect(url_for('login'))
 
     return render_template('register.html')
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -175,6 +177,7 @@ def user_dashboard():
     projects = cur.fetchall()
     cur.close()
 
+    projects = get_projects_for_user(user_id)  # Example function
     return render_template("user_dashboard.html", username=session['username'], projects=projects)
 
 @app.route('/dashboard')

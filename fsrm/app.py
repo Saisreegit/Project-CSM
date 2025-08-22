@@ -1,7 +1,20 @@
+from flask import Flask
+from config import UPLOAD_FOLDER, SECRET_KEY, SMTP_SERVER, SMTP_PORT, EMAIL_SENDER, EMAIL_PASSWORD
+app = Flask(__name__)
+app.secret_key = SECRET_KEY
+import sys
 import os
-from flask import Flask, request, send_from_directory, redirect, url_for, jsonify, flash, g
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from flask import request, render_template, send_from_directory, redirect, url_for, jsonify, flash, g
 from datetime import datetime
-import json
+import helpers
+from helpers import read_docx  # only if you're using read_docx
+#helpers.some_function()
+
+from . import fsrm_bp # This is the blueprint you defined in fsrm/init.py
+@fsrm_bp.route('/fsrm_home')
+def fsrm_home():
+    return render_template('fsrm/fsrm_home.html')
 
 # Import functions from helpers.py
 from helpers import (
@@ -9,19 +22,7 @@ from helpers import (
     read_excel_sheets_with_names, read_docx, read_ppt,
     compare_documents_side_by_side
 )
-
-# Import templates from respective files
-from templates.owner_dashboard import OWNER_TEMPLATE
-from templates.reviewer_dashboard import REVIEWER_TEMPLATE
-from templates.document_view import DOCUMENT_VIEW_TEMPLATE
-from templates.edit_document import EDIT_DOC_TEMPLATE
-from templates.audit_log import AUDIT_LOG_TEMPLATE
-
-# Import configuration
-from config import UPLOAD_FOLDER, SECRET_KEY, SMTP_SERVER, SMTP_PORT, EMAIL_SENDER, EMAIL_PASSWORD
-
 # --- Flask App Setup ---
-app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
 if not os.path.exists(UPLOAD_FOLDER):
@@ -39,36 +40,36 @@ audit_log = [] # Simple log of actions
 
 # --- Flask Routes ---
 
-@app.route('/uploads/<filename>')
+@fsrm_bp.route('/uploads/<filename>')
 def uploaded_file(filename):
     """Serves uploaded files."""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/')
-def index():
+@fsrm_bp.route('/index')
+def fsrm_index():
     """Default route, redirect to owner dashboard."""
-    return redirect(url_for('owner_dashboard'))
+    return redirect(url_for('fsrm.owner_dashboard'))
 
-@app.route('/owner_dashboard')
+@fsrm_bp.route('/owner_dashboard')
 def owner_dashboard():
     """Owner's dashboard (main page for uploading and viewing their documents)."""
     current_owner_email = request.args.get('email', '')
     owner_docs = {doc_id: doc for doc_id, doc in reviews.items() if doc['owner_email'] == current_owner_email}
-    return render_template_string(OWNER_TEMPLATE, reviews=owner_docs, request=request, current_owner_email=current_owner_email)
+    return render_template("owner_dashboard.html", reviews=owner_docs, request=request, current_owner_email=current_owner_email)
 
-@app.route('/reviewer_dashboard')
+@fsrm_bp.route('/reviewer_dashboard')
 def reviewer_dashboard():
     """Reviewer's dashboard (lists documents assigned to a specific reviewer)."""
     reviewer_email = request.args.get('email')
     if not reviewer_email:
         flash("Reviewer email is required to view this dashboard. Please use a URL like `/reviewer_dashboard?email=your_email@example.com`", "info")
-        return render_template_string(REVIEWER_TEMPLATE, reviewer_docs={}, reviewer_email="")
+        return render_template("reviewer_dashboard.html", reviewer_docs={}, reviewer_email="")
 
     reviewer_docs = {doc_id: doc for doc_id, doc in reviews.items() if doc['assigned_reviewer_email'] == reviewer_email}
-    return render_template_string(REVIEWER_TEMPLATE, reviewer_docs=reviewer_docs, reviewer_email=reviewer_email, request=request)
+    return render_template("reviewer_dashboard.html", reviewer_docs=reviewer_docs, reviewer_email=reviewer_email, request=request)
 
 
-@app.route('/upload', methods=['POST'])
+@fsrm_bp.route('/upload', methods=['POST'])
 def upload():
     """Handles document upload by the owner."""
     owner_name = request.form.get('owner_name', '').strip()
@@ -133,7 +134,7 @@ Document Owner
     return redirect(url_for('owner_dashboard', email=owner_email))
 
 
-@app.route('/edit_document/<doc_id>', methods=['GET', 'POST'])
+@fsrm_bp.route('/edit_document/<doc_id>', methods=['GET', 'POST'])
 def edit_document(doc_id):
     doc = reviews.get(doc_id)
     if not doc:
@@ -283,10 +284,10 @@ Document Owner
         flash("Document details updated.", "success")
         return redirect(url_for('document_view', doc_id=doc_id, role='owner', email=current_owner_email))
 
-    return render_template_string(EDIT_DOC_TEMPLATE, doc=doc, request=request, current_owner_email=current_owner_email)
+    return render_template("edit_document.html", doc=doc, request=request, current_owner_email=current_owner_email)
 
 
-@app.route('/document_view/<doc_id>')
+@fsrm_bp.route('/document_view/<doc_id>')
 def document_view(doc_id):
     """Displays a single document for review or owner view."""
     doc = reviews.get(doc_id)
@@ -396,7 +397,7 @@ def document_view(doc_id):
             right_panel_html = "<p>No preview available or selection possible.</p>"
 
 
-    return render_template_string(DOCUMENT_VIEW_TEMPLATE, doc=doc, role=role, current_user_email=current_user_email, request=request,
+    return render_template("document_view.html", doc=doc, role=role, current_user_email=current_user_email, request=request,
                                   left_panel_html=left_panel_html,
                                   right_panel_html=right_panel_html,
                                   selected_version_a=version_a_id,
@@ -409,7 +410,7 @@ def document_view(doc_id):
                                   selected_sheet_b=selected_sheet_b)
 
 
-@app.route('/add_comment/<doc_id>', methods=['POST'])
+@fsrm_bp.route('/add_comment/<doc_id>', methods=['POST'])
 def add_comment(doc_id):
     """Adds one or more new comments to a document."""
     doc = reviews.get(doc_id)
@@ -499,7 +500,7 @@ Review System
     return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
 
-@app.route('/update_comment_status/<doc_id>/<int:comment_id>', methods=['POST'])
+@fsrm_bp.route('/update_comment_status/<doc_id>/<int:comment_id>', methods=['POST'])
 def update_comment_status(doc_id, comment_id):
     """Updates the status of a specific comment."""
     doc = reviews.get(doc_id)
@@ -551,7 +552,7 @@ Review System
 
     return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
-@app.route('/delete_comment/<doc_id>/<int:comment_id>', methods=['POST'])
+@fsrm_bp.route('/delete_comment/<doc_id>/<int:comment_id>', methods=['POST'])
 def delete_comment(doc_id, comment_id):
     doc = reviews.get(doc_id)
     if not doc:
@@ -595,7 +596,7 @@ Review System
     return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
 
-@app.route('/submit_review/<doc_id>', methods=['POST'])
+@fsrm_bp.route('/submit_review/<doc_id>', methods=['POST'])
 def submit_review(doc_id):
     """Allows reviewer to submit their review."""
     doc = reviews.get(doc_id)
@@ -678,7 +679,7 @@ Review System
     return redirect(url_for('reviewer_dashboard', email=reviewer_email))
 
 
-@app.route('/set_deadline/<doc_id>', methods=['POST'])
+@fsrm_bp.route('/set_deadline/<doc_id>', methods=['POST'])
 def set_deadline(doc_id):
     doc = reviews.get(doc_id)
     if not doc:
@@ -717,7 +718,7 @@ Review System
         flash("Invalid date format. Please use YYYY-MM-DD.", "error")
         return redirect(url_for('document_view', doc_id=doc_id, role='reviewer', email=current_user_email))
 
-@app.route('/add_doc_chat/<doc_id>', methods=['POST'])
+@fsrm_bp.route('/add_doc_chat/<doc_id>', methods=['POST'])
 def add_doc_chat(doc_id):
     """Adds a chat message to the document's general chat."""
     doc = reviews.get(doc_id)
@@ -771,10 +772,10 @@ Review System
     return redirect(url_for('document_view', doc_id=doc_id, role=current_user_role, email=current_user_email))
 
 
-@app.route('/audit_log')
+@fsrm_bp.route('/audit_log')
 def view_audit_log():
     """Displays the in-memory audit log."""
-    return render_template_string(AUDIT_LOG_TEMPLATE, audit_log=audit_log)
+    return render_template("audit_log.html", audit_log=audit_log)
 
 if __name__ == '__main__':
     app.run(debug=True)
