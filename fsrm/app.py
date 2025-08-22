@@ -39,7 +39,7 @@ reviews = {}
 audit_log = [] # Simple log of actions
 
 # --- Flask Routes ---
-
+print(app.config['UPLOAD_FOLDER'])
 @fsrm_bp.route('/uploads/<filename>')
 def uploaded_file(filename):
     """Serves uploaded files."""
@@ -55,7 +55,7 @@ def owner_dashboard():
     """Owner's dashboard (main page for uploading and viewing their documents)."""
     current_owner_email = request.args.get('email', '')
     owner_docs = {doc_id: doc for doc_id, doc in reviews.items() if doc['owner_email'] == current_owner_email}
-    return render_template("owner_dashboard.html", reviews=owner_docs, request=request, current_owner_email=current_owner_email)
+    return  render_template("owner_dashboard.html", reviews=owner_docs, request=request, current_owner_email=current_owner_email)
 
 @fsrm_bp.route('/reviewer_dashboard')
 def reviewer_dashboard():
@@ -63,13 +63,14 @@ def reviewer_dashboard():
     reviewer_email = request.args.get('email')
     if not reviewer_email:
         flash("Reviewer email is required to view this dashboard. Please use a URL like `/reviewer_dashboard?email=your_email@example.com`", "info")
-        return render_template("reviewer_dashboard.html", reviewer_docs={}, reviewer_email="")
+        return  render_template("reviewer_dashboard.html", reviewer_docs={}, reviewer_email="")
 
     reviewer_docs = {doc_id: doc for doc_id, doc in reviews.items() if doc['assigned_reviewer_email'] == reviewer_email}
-    return render_template("reviewer_dashboard.html", reviewer_docs=reviewer_docs, reviewer_email=reviewer_email, request=request)
+    return  render_template("reviewer_dashboard.html", reviewer_docs=reviewer_docs, reviewer_email=reviewer_email, request=request)
 
 
 @fsrm_bp.route('/upload', methods=['POST'])
+
 def upload():
     """Handles document upload by the owner."""
     owner_name = request.form.get('owner_name', '').strip()
@@ -78,75 +79,93 @@ def upload():
 
     if not all([owner_name, owner_email, assigned_reviewer_email]):
         flash("All owner name, email, and reviewer email are required.", "error")
-        return redirect(url_for('owner_dashboard', email=owner_email))
+        return redirect(url_for('fsrm.owner_dashboard', email=owner_email))
 
     if 'file' not in request.files:
         flash("No file part in the request.", "error")
-        return redirect(url_for('owner_dashboard', email=owner_email))
+        return redirect(url_for('fsrm.owner_dashboard', email=owner_email))
 
     f = request.files['file']
+    
     if f.filename == '':
         flash("No selected file.", "error")
-        return redirect(url_for('owner_dashboard', email=owner_email))
+        return redirect(url_for('fsrm.owner_dashboard', email=owner_email))
 
-    fname, path = save_file(f, app.config['UPLOAD_FOLDER']) # Pass UPLOAD_FOLDER
-    ftype = detect_type(fname)
-    doc_id = f"{fname.replace('.', '_')}_{datetime.now().strftime('%Y%m%d%H%M%S')}" # More unique ID
+    try:
+        # --- Save file ---
+        fname, path = save_file(f, app.config['UPLOAD_FOLDER'])
+        ftype = detect_type(fname)
 
-    reviews[doc_id] = {
-        'doc_id': doc_id,
-        'filename': fname,
-        'path': path,
-        'type': ftype,
-        'version': "1.0",
-        'versions': [{'version_id': "1.0", 'filename': fname, 'path': path, 'timestamp': datetime.now().isoformat()}], # Store historical versions
-        'status': 'Pending Review', # Initial status
-        'owner_name': owner_name,
-        'owner_email': owner_email,
-        'assigned_reviewer_email': assigned_reviewer_email,
-        'comments': [], # List to store review comments
-        'doc_chats': [], # NEW: List to store document-level chat messages
-        'deadline': None, # Initial deadline for the document, can be set by reviewer
-        'needs_re_review': False # New flag to highlight if document needs re-review
-    }
-    log_action(audit_log, f"Document '{fname}' ({doc_id}) uploaded by {owner_name} ({owner_email}). Assigned to {assigned_reviewer_email}.")
-    flash(f"Document '{fname}' uploaded successfully and assigned to {assigned_reviewer_email}.", "success")
+        # --- Create unique doc ID ---
+        doc_id = f"{fname.replace('.', '_')}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-    # --- THE KEY CHANGE FOR THE EMAIL LINK IS HERE ---
-    # Instead of linking to the specific document_view, link to the general reviewer_dashboard.
-    # This prevents "Document not found" errors if the server restarts and data is lost.
-    reviewer_link = url_for('reviewer_dashboard', email=assigned_reviewer_email, _external=True)
-    subject = f"[New Document Available] {fname}"
-    body = f"""
-Dear Reviewer,
+        # --- Store in reviews dict ---
+        reviews[doc_id] = {
+            'doc_id': doc_id,
+            'filename': fname,
+            'path': path,
+            'type': ftype,
+            'version': "1.0",
+            'versions': [{
+                'version_id': "1.0",
+                'filename': fname,
+                'path': path,
+                'timestamp': datetime.now().isoformat()
+            }],
+            'status': 'Pending Review',
+            'owner_name': owner_name,
+            'owner_email': owner_email,
+            'assigned_reviewer_email': assigned_reviewer_email,
+            'comments': [],
+            'doc_chats': [],
+            'deadline': None,
+            'needs_re_review': False
+        }
 
-A new document "{fname}" has been uploaded by {owner_name} for your review.
-It is now available on your reviewer dashboard.
+        # --- Log & flash success ---
+        log_action(audit_log, f"Document '{fname}' ({doc_id}) uploaded by {owner_name} ({owner_email}). Assigned to {assigned_reviewer_email}.")
+        flash(f"Document '{fname}' uploaded successfully and assigned to {assigned_reviewer_email}.", "success")
 
-Please access your dashboard here: {reviewer_link}
+        # --- Notify reviewer by email ---
+        reviewer_link = url_for('fsrm.reviewer_dashboard', email=assigned_reviewer_email, _external=True)
+        subject = f"[New Document Available] {fname}"
+        body = f"""
+        Dear Reviewer,
 
-Regards,
-Document Owner
-"""
-    send_email(assigned_reviewer_email, subject, body, SMTP_SERVER, SMTP_PORT, EMAIL_SENDER, EMAIL_PASSWORD)
+        A new document "{fname}" has been uploaded by {owner_name} for your review.
+        It is now available on your reviewer dashboard.
 
-    # Redirect owner back to their dashboard
-    return redirect(url_for('owner_dashboard', email=owner_email))
+        Please access your dashboard here: {reviewer_link}
 
+        Regards,
+        Document Owner
+        """
+
+        send_email(assigned_reviewer_email, subject, body,
+                   SMTP_SERVER, SMTP_PORT, EMAIL_SENDER, EMAIL_PASSWORD)
+
+    except Exception as e:
+        # Handle unexpected errors
+        print("Upload error:", str(e))
+        flash(f"Error uploading document: {str(e)}", "error")
+        return redirect(url_for('fsrm.owner_dashboard', email=owner_email))
+
+    # --- Redirect back to owner dashboard after success ---
+    return redirect(url_for('fsrm.owner_dashboard', email=owner_email))
 
 @fsrm_bp.route('/edit_document/<doc_id>', methods=['GET', 'POST'])
 def edit_document(doc_id):
     doc = reviews.get(doc_id)
     if not doc:
         flash("Document not found. It might have been cleared due to server restart.", "error")
-        return redirect(url_for('owner_dashboard', email=request.args.get('email', '')))
+        return redirect(url_for('fsrm.owner_dashboard', email=request.args.get('email', '')))
 
     current_owner_email = request.args.get('email')
 
     # Basic Authorization: Insecure for production, replace with proper auth.
     if not (current_owner_email == doc['owner_email']):
         flash("Access Denied: You are not authorized to edit this document.", "error")
-        return redirect(url_for('owner_dashboard', email=current_owner_email))
+        return redirect(url_for('fsrm.owner_dashboard', email=current_owner_email))
 
     if request.method == 'POST':
         original_filename = doc['filename']
@@ -206,7 +225,7 @@ def edit_document(doc_id):
             log_action(audit_log, f"Document '{doc_id}' updated with new file '{new_fname}' by {doc['owner_name']}. New version: {doc['version']}.")
 
             # Send email to reviewer with link to the updated document on their dashboard
-            reviewer_link = url_for('reviewer_dashboard', email=new_assigned_reviewer_email, _external=True)
+            reviewer_link = url_for('fsrm.reviewer_dashboard', email=new_assigned_reviewer_email, _external=True)
             subject = f"[Document Re-uploaded] {doc['filename']} (Version {doc['version']})"
             body = f"""
 Dear Reviewer,
@@ -229,7 +248,7 @@ Document Owner
             log_action(audit_log, f"Document '{doc_id}' assigned reviewer changed from {original_assigned_reviewer_email} to {new_assigned_reviewer_email}.")
 
             # Notify new reviewer
-            reviewer_link = url_for('reviewer_dashboard', email=new_assigned_reviewer_email, _external=True) # Changed link
+            reviewer_link = url_for('fsrm.reviewer_dashboard', email=new_assigned_reviewer_email, _external=True) # Changed link
             subject = f"[Document Assigned/Reassigned] {doc['filename']}"
             body = f"""
 Dear Reviewer,
@@ -282,9 +301,9 @@ Document Owner
 
 
         flash("Document details updated.", "success")
-        return redirect(url_for('document_view', doc_id=doc_id, role='owner', email=current_owner_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role='owner', email=current_owner_email))
 
-    return render_template("edit_document.html", doc=doc, request=request, current_owner_email=current_owner_email)
+    return  render_template("edit_document.html", doc=doc, request=request, current_owner_email=current_owner_email)
 
 
 @fsrm_bp.route('/document_view/<doc_id>')
@@ -298,9 +317,9 @@ def document_view(doc_id):
         role = request.args.get('role')
         email = request.args.get('email')
         if role == 'reviewer':
-            return redirect(url_for('reviewer_dashboard', email=email))
+            return redirect(url_for('fsrm.reviewer_dashboard', email=email))
         else: # Default to owner dashboard
-            return redirect(url_for('owner_dashboard', email=email))
+            return redirect(url_for('fsrm.owner_dashboard', email=email))
 
     role = request.args.get('role')
     current_user_email = request.args.get('email')
@@ -308,10 +327,10 @@ def document_view(doc_id):
     # Basic authorization check
     if role == 'owner' and current_user_email != doc['owner_email']:
         flash("Access Denied: You are not the owner of this document.", "error")
-        return redirect(url_for('owner_dashboard', email=current_user_email))
+        return redirect(url_for('fsrm.owner_dashboard', email=current_user_email))
     elif role == 'reviewer' and current_user_email != doc['assigned_reviewer_email']:
         flash("Access Denied: This document is not assigned to you for review.", "error")
-        return redirect(url_for('reviewer_dashboard', email=current_user_email))
+        return redirect(url_for('fsrm.reviewer_dashboard', email=current_user_email))
     elif not role or not current_user_email:
         flash("Access Denied: Missing role or email in URL.", "error")
         return redirect(url_for('index')) # Or a login page
@@ -382,7 +401,7 @@ def document_view(doc_id):
             left_panel_html += "</div>"
             right_panel_html = "<p>Select another version to compare.</p>"
         elif doc['type'] == 'pdf':
-            left_panel_html = f"<embed src='{url_for('uploaded_file', filename=doc['filename'])}' type='application/pdf' width='100%' height='600px' />"
+            left_panel_html = f"<embed src='{url_for('fsrm.uploaded_file', filename=doc['filename'])}' type='application/pdf' width='100%' height='600px' />"
             right_panel_html = "<p>Select another version to compare.</p>"
         elif doc['type'] == 'ppt':
             ppt_slides = read_ppt(doc['path'])
@@ -393,11 +412,11 @@ def document_view(doc_id):
                 left_html += "</div>"
             right_panel_html = "<p>Select another version to compare.</p>"
         else:
-            left_panel_html = f"<p>No preview available for this file type.</p><p><a href='{url_for('uploaded_file', filename=doc['filename'])}' download>Download Original File</a></p>"
+            left_panel_html = f"<p>No preview available for this file type.</p><p><a href='{url_for('fsrm.uploaded_file', filename=doc['filename'])}' download>Download Original File</a></p>"
             right_panel_html = "<p>No preview available or selection possible.</p>"
 
 
-    return render_template("document_view.html", doc=doc, role=role, current_user_email=current_user_email, request=request,
+    return  render_template("document_view.html", doc=doc, role=role, current_user_email=current_user_email, request=request,
                                   left_panel_html=left_panel_html,
                                   right_panel_html=right_panel_html,
                                   selected_version_a=version_a_id,
@@ -416,7 +435,7 @@ def add_comment(doc_id):
     doc = reviews.get(doc_id)
     if not doc:
         flash("Document not found.", "error")
-        return redirect(url_for('owner_dashboard')) # Fallback for missing doc
+        return redirect(url_for('fsrm.owner_dashboard')) # Fallback for missing doc
 
     current_user_email = request.args.get('email')
     comments_added_count = 0
@@ -436,7 +455,7 @@ def add_comment(doc_id):
 
     if not comment_data:
         flash("No comments submitted.", "warning")
-        return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
     for idx in sorted(comment_data.keys()):
         comment_entry = comment_data[idx]
@@ -480,7 +499,7 @@ def add_comment(doc_id):
         flash(f"{comments_added_count} new comment(s) added successfully.", "success")
         doc['status'] = 'Under Review' # Update document status
         # Notify owner about new comments
-        owner_link = url_for('document_view', doc_id=doc_id, role='owner', email=doc['owner_email'], _external=True)
+        owner_link = url_for('fsrm.document_view', doc_id=doc_id, role='owner', email=doc['owner_email'], _external=True)
         subject = f"[New Comments] {doc['filename']} has new comments"
         body = f"""
 Dear {doc['owner_name']},
@@ -497,7 +516,7 @@ Review System
     else:
         flash("No valid comments were added.", "warning")
 
-    return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
+    return redirect(url_for('fsrm.document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
 
 @fsrm_bp.route('/update_comment_status/<doc_id>/<int:comment_id>', methods=['POST'])
@@ -506,19 +525,19 @@ def update_comment_status(doc_id, comment_id):
     doc = reviews.get(doc_id)
     if not doc:
         flash("Document not found.", "error")
-        return redirect(url_for('owner_dashboard'))
+        return redirect(url_for('fsrm.owner_dashboard'))
 
     current_user_email = request.args.get('email')
     comment = next((c for c in doc['comments'] if c['comment_id'] == comment_id), None)
 
     if not comment:
         flash("Comment not found.", "error")
-        return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
     new_status = request.form.get('status')
     if not new_status or new_status not in ['Open', 'In Progress', 'Resolved', 'Closed']:
         flash("Invalid status provided.", "error")
-        return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
     original_status = comment['status']
     comment['status'] = new_status
@@ -541,7 +560,7 @@ Dear {doc['owner_name']} and {doc['assigned_reviewer_email']},
 The status of comment ID {comment_id} in document "{doc['filename']}" has been updated to '{new_status}' by {current_user_email}.
 Issue: {comment['issue']}
 
-You can view the document and comments here: {url_for('document_view', doc_id=doc_id, role='owner', email=doc['owner_email'], _external=True)}
+You can view the document and comments here: {url_for('fsrm.document_view', doc_id=doc_id, role='owner', email=doc['owner_email'], _external=True)}
 
 Regards,
 Review System
@@ -550,14 +569,14 @@ Review System
     if doc['owner_email'] != doc['assigned_reviewer_email']: # Avoid sending duplicate if owner is also reviewer
         send_email(doc['assigned_reviewer_email'], subject, body, SMTP_SERVER, SMTP_PORT, EMAIL_SENDER, EMAIL_PASSWORD)
 
-    return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
+    return redirect(url_for('fsrm.document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
 @fsrm_bp.route('/delete_comment/<doc_id>/<int:comment_id>', methods=['POST'])
 def delete_comment(doc_id, comment_id):
     doc = reviews.get(doc_id)
     if not doc:
         flash("Document not found.", "error")
-        return redirect(url_for('owner_dashboard'))
+        return redirect(url_for('fsrm.fsrm.owner_dashboard'))
 
     current_user_email = request.args.get('email')
     
@@ -566,11 +585,11 @@ def delete_comment(doc_id, comment_id):
     
     if not comment_to_delete:
         flash("Comment not found.", "error")
-        return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
     if not (current_user_email == comment_to_delete['comment_author_email'] or current_user_email == doc['owner_email'] or current_user_email == doc['assigned_reviewer_email']):
         flash("Access Denied: You are not authorized to delete this comment.", "error")
-        return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
     doc['comments'] = [c for c in doc['comments'] if c['comment_id'] != comment_id]
     flash(f"Comment {comment_id} deleted.", "success")
@@ -584,7 +603,7 @@ Dear {doc['owner_name']} and {doc['assigned_reviewer_email']},
 Comment ID {comment_id} in document "{doc['filename']}" has been deleted by {current_user_email}.
 The deleted issue was: {comment_to_delete['issue']}
 
-You can view the document and remaining comments here: {url_for('document_view', doc_id=doc_id, role='owner', email=doc['owner_email'], _external=True)}
+You can view the document and remaining comments here: {url_for('fsrm.document_view', doc_id=doc_id, role='owner', email=doc['owner_email'], _external=True)}
 
 Regards,
 Review System
@@ -593,7 +612,7 @@ Review System
     if doc['owner_email'] != doc['assigned_reviewer_email']:
         send_email(doc['assigned_reviewer_email'], subject, body, SMTP_SERVER, SMTP_PORT, EMAIL_SENDER, EMAIL_PASSWORD)
 
-    return redirect(url_for('document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
+    return redirect(url_for('fsrm.document_view', doc_id=doc_id, role=request.args.get('role'), email=current_user_email))
 
 
 @fsrm_bp.route('/submit_review/<doc_id>', methods=['POST'])
@@ -602,19 +621,19 @@ def submit_review(doc_id):
     doc = reviews.get(doc_id)
     if not doc:
         flash("Document not found.", "error")
-        return redirect(url_for('reviewer_dashboard', email=request.args.get('email', '')))
+        return redirect(url_for('fsrm.reviewer_dashboard', email=request.args.get('email', '')))
 
     reviewer_email = request.args.get('email')
     if reviewer_email != doc['assigned_reviewer_email']:
         flash("Access Denied: This document is not assigned to you for review.", "error")
-        return redirect(url_for('reviewer_dashboard', email=reviewer_email))
+        return redirect(url_for('fsrm.reviewer_dashboard', email=reviewer_email))
 
     new_status = request.form.get('new_status')
     feedback = request.form.get('feedback', '').strip()
 
     if not new_status:
         flash("Please select a new status for the document.", "error")
-        return redirect(url_for('document_view', doc_id=doc_id, role='reviewer', email=reviewer_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role='reviewer', email=reviewer_email))
     
     # Valid transitions
     valid_transitions = {
@@ -628,7 +647,7 @@ def submit_review(doc_id):
 
     if new_status not in valid_transitions.get(doc['status'], []):
         flash(f"Invalid status transition from '{doc['status']}' to '{new_status}'.", "error")
-        return redirect(url_for('document_view', doc_id=doc_id, role='reviewer', email=reviewer_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role='reviewer', email=reviewer_email))
 
     original_status = doc['status']
     doc['status'] = new_status
@@ -658,7 +677,7 @@ def submit_review(doc_id):
         log_action(audit_log, f"Review submitted for '{doc_id}' by {reviewer_email}. Status: {new_status}.")
 
     # Notify owner
-    owner_link = url_for('document_view', doc_id=doc_id, role='owner', email=doc['owner_email'], _external=True)
+    owner_link = url_for('fsrm.document_view', doc_id=doc_id, role='owner', email=doc['owner_email'], _external=True)
     subject = f"[Document Status Update] Your document '{doc['filename']}' is now '{doc['status']}'"
     body = f"""
 Dear {doc['owner_name']},
@@ -676,7 +695,7 @@ Review System
 """
     send_email(doc['owner_email'], subject, body, SMTP_SERVER, SMTP_PORT, EMAIL_SENDER, EMAIL_PASSWORD)
 
-    return redirect(url_for('reviewer_dashboard', email=reviewer_email))
+    return redirect(url_for('fsrm.reviewer_dashboard', email=reviewer_email))
 
 
 @fsrm_bp.route('/set_deadline/<doc_id>', methods=['POST'])
@@ -698,7 +717,7 @@ def set_deadline(doc_id):
         flash(f"Deadline for document '{doc['filename']}' set to {deadline_date.strftime('%Y-%m-%d')}.", "success")
 
         # Notify owner about the new deadline
-        owner_link = url_for('document_view', doc_id=doc_id, role='owner', email=doc['owner_email'], _external=True)
+        owner_link = url_for('fsrm.document_view', doc_id=doc_id, role='owner', email=doc['owner_email'], _external=True)
         subject = f"[Deadline Set] Document: {doc['filename']}"
         body = f"""
 Dear {doc['owner_name']},
@@ -713,10 +732,10 @@ Review System
 """
         send_email(doc['owner_email'], subject, body, SMTP_SERVER, SMTP_PORT, EMAIL_SENDER, EMAIL_PASSWORD)
 
-        return redirect(url_for('document_view', doc_id=doc_id, role='reviewer', email=current_user_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role='reviewer', email=current_user_email))
     except ValueError:
         flash("Invalid date format. Please use YYYY-MM-DD.", "error")
-        return redirect(url_for('document_view', doc_id=doc_id, role='reviewer', email=current_user_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role='reviewer', email=current_user_email))
 
 @fsrm_bp.route('/add_doc_chat/<doc_id>', methods=['POST'])
 def add_doc_chat(doc_id):
@@ -724,7 +743,7 @@ def add_doc_chat(doc_id):
     doc = reviews.get(doc_id)
     if not doc:
         flash("Document not found.", "error")
-        return redirect(url_for('owner_dashboard'))
+        return redirect(url_for('fsrm.owner_dashboard'))
 
     current_user_email = request.args.get('email')
     current_user_role = request.args.get('role')
@@ -733,7 +752,7 @@ def add_doc_chat(doc_id):
 
     if not message:
         flash("Message cannot be empty.", "error")
-        return redirect(url_for('document_view', doc_id=doc_id, role=current_user_role, email=current_user_email))
+        return redirect(url_for('fsrm.document_view', doc_id=doc_id, role=current_user_role, email=current_user_email))
     
     # Basic authorization
     if not (current_user_email == doc['owner_email'] or current_user_email == doc['assigned_reviewer_email']):
@@ -753,7 +772,7 @@ def add_doc_chat(doc_id):
     recipient_email = doc['owner_email'] if current_user_email == doc['assigned_reviewer_email'] else doc['assigned_reviewer_email']
     recipient_role = 'owner' if current_user_email == doc['assigned_reviewer_email'] else 'reviewer'
 
-    doc_link = url_for('document_view', doc_id=doc_id, role=recipient_role, email=recipient_email, _external=True)
+    doc_link = url_for('fsrm.document_view', doc_id=doc_id, role=recipient_role, email=recipient_email, _external=True)
     subject = f"[Document Chat] New message in '{doc['filename']}'"
     body = f"""
 Dear {'Owner' if recipient_role == 'owner' else 'Reviewer'},
@@ -769,13 +788,13 @@ Review System
 """
     send_email(recipient_email, subject, body, SMTP_SERVER, SMTP_PORT, EMAIL_SENDER, EMAIL_PASSWORD)
 
-    return redirect(url_for('document_view', doc_id=doc_id, role=current_user_role, email=current_user_email))
+    return redirect(url_for('fsrm.document_view', doc_id=doc_id, role=current_user_role, email=current_user_email))
 
 
 @fsrm_bp.route('/audit_log')
 def view_audit_log():
     """Displays the in-memory audit log."""
-    return render_template("audit_log.html", audit_log=audit_log)
+    return  render_template("audit_log.html", audit_log=audit_log)
 
 if __name__ == '__main__':
     app.run(debug=True)
