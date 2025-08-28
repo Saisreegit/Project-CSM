@@ -1,0 +1,69 @@
+<!DOCTYPE html><html>
+<head>
+  <title>Final Page</title>
+  <style>
+    body { font-family: Arial; background: #f9f9f9; padding: 20px; }
+    table { width: 95%; margin: auto; border-collapse: collapse; background: white; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+    th { background: #555; color: white; }
+    .part-header { background-color: #ddd; font-weight: bold; padding: 10px; font-size: 16px; }
+    input[type="date"], input[type="text"] {
+      width: 100%;
+      padding: 5px;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <h2 style="text-align:center;">Final Summary – Products Not Tailored</h2>
+  <table>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Start Date</th>
+      <th>End Date</th>
+      <th>Predecessors</th>
+      <th>Successor</th>
+    </tr>
+    {% for item in final_data %}
+      {% if item.is_part %}
+        <tr><td colspan="6" class="part-header">{{ item.idx }} – {{ item.name }}</td></tr>
+      {% else %}
+        <tr>
+          <td>{{ item.idx }}</td>
+          <td>{{ item.name }}</td>
+          <td>
+  <input type="date" name="start_date_{{ item.idx }}" 
+         value="{{ FINAL_DATE_DATA.get(item.idx, {}).get('start_date', '') }}"
+         onchange="autoSaveFinal('{{ item.idx }}')">
+</td>
+<td>
+  <input type="date" name="end_date_{{ item.idx }}" 
+         value="{{ FINAL_DATE_DATA.get(item.idx, {}).get('end_date', '') }}"
+         onchange="autoSaveFinal('{{ item.idx }}')">
+</td>
+
+          <td>{{ item.predecessors }}</td>
+          <td>{{ item.successor }}</td>
+        </tr>
+      {% endif %}
+    {% endfor %}
+  </table>
+  <script>
+function autoSaveFinal(idx) {
+    const startDate = document.querySelector(`[name="start_date_${idx}"]`)?.value || "";
+    const endDate = document.querySelector(`[name="end_date_${idx}"]`)?.value || "";
+
+    fetch("/autosave_final", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idx, start_date: startDate, end_date: endDate })
+    }).then(res => res.json()).then(data => {
+        if (!data.success) {
+            console.error("Failed to autosave final data for:", idx);
+        }
+    });
+}
+</script>
+</body>
+</html>
