@@ -10,9 +10,9 @@
 
   {% if projects %}
     <div class="grid">
-      {% for pid, pname in projects %}
-        <a class="nav-btn" href="{{ url_for('work_products', project_id=pid) }}">
-          {{ pname }} ➜
+      {% for project in projects %}
+        <a class="nav-btn" href="{{ url_for('work_products', project_id=project.id) }}">
+          {{ project.name }}
         </a>
       {% endfor %}
 
@@ -22,6 +22,11 @@
         </a>
       {% endif %}
     </div>
+
+    <div style="text-align: center; margin-top: 20px;">
+      <a href="{{ url_for('assign_project') }}" class="btn-assign">Assign Project</a>
+    </div>
+
   {% else %}
     <p>No projects available.</p>
   {% endif %}

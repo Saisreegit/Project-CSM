@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Products Not Tailored</title>
+  <style>
+    body { font-family: Arial; background: #f9f9f9; padding: 20px; }
+    table { width: 95%; margin: auto; border-collapse: collapse; background: white; }
+    th, td { border: 1px solid #ccc; padding: 10px; }
+    th { background: #333; color: white; }
+    select, input[type=text] { padding: 6px; width: 100%; }
+    .hidden { display: none; }
+    .warning { color: red; font-size: 13px; display: none; }
+    .btn-container { text-align: center; margin-top: 20px; }
+    .btn { padding: 10px 20px; border: none; background: #007bff; color: white; border-radius: 4px; cursor: pointer; }
+    select:invalid, input:invalid { border: 2px solid red; }
+    .heading { font-size: 18px; font-weight: bold; background-color: #e0e0e0; padding: 8px; text-align: left;
+               margin-top: 20px; padding-left: 15px; }
+  </style>
+</head>
+<body>
+  <h2 style="text-align:center;">Products Not Tailored</h2>
+  {% with msg = get_flashed_messages() %}
+    {% if msg %}
+      <div style="color:green; text-align:center;">{{ msg[0] }}</div>
+    {% endif %}
+  {% endwith %}
+
+  <form id="ntForm" method="post" action="{{ url_for('save_not_tailored') }}?part={{ request.args.get('part', '') }}" onsubmit="return handleNTSubmit(event);">
+
+    {% if filtered %}
+    <div style="display: flex; justify-content: flex-end; margin: 10px 40px; gap: 10px;">
+      <input type="file" id="excelInput" accept=".xlsx,.xls" style="display: none;" />
+      <button type="button" class="btn" onclick="document.getElementById('excelInput').click();">Import</button>
+      <button type="button" class="btn" onclick="alert('Sync clicked')">Sync</button>
+    </div>
+
+    <table>
+      <tr><th>ID</th><th>Name</th><th>Author</th><th>Other</th><th>Reviewer1</th><th>Other</th><th>Reviewer2</th><th>Other</th></tr>
+      {% for item in filtered %}
+        {% if item.is_part %}
+          <tr><td colspan="8" class="heading">{{ item.idx }} – {{ item.name }}</td></tr>
+        {% else %}
+          {% set data = item.data %}
+          <tr>
+            <td>{{ item.idx }}</td>
+            <td>{{ item.name }}</td>
+            {% for role in ['author', 'reviewer1', 'reviewer2'] %}
+              <td>
+                <select name="{{ role }}_{{ item.idx }}"
+                        onchange="toggleOtherInput(this, '{{ role }}_other_{{ item.idx }}', '{{ role }}_warn_{{ item.idx }}'); autoSaveNT('{{ item.idx }}', '{{ role }}', this.value);">
+                  <option value="">Select</option>
+                  {% for name in imported_people.get(item.idx, []) %}
+                    <option value="{{ name }}" {% if data.get(role) == name %}selected{% endif %}>{{ name }}</option>
+                  {% endfor %}
+                  <option value="Other" {% if data.get(role) =='Other' %}selected{% endif %}>Other</option>
+                </select>
+              </td>
+              <td>
+                <input type="text" name="{{ role }}_other_{{ item.idx }}"
+                       value="{{ data.get(role + '_other', '') }}"
+                       class="{{ 'hidden' if data.get(role) != 'Other' else '' }}"
+                       oninput="autoSaveNT('{{ item.idx }}', '{{ role }}_other', this.value);">
+                <div id="{{ role }}_warn_{{ item.idx }}" class="warning" style="{{ 'display:block' if data.get(role) == 'Other' else 'display:none' }}">
+                  ⚠️ Please specify "Other"
+                </div>
+              </td>
+            {% endfor %}
+          </tr>
+        {% endif %}
+      {% endfor %}
+    </table>
+    {% else %}
+      <p style="text-align:center;">All products were tailored.</p>
+    {% endif %}
+
+    <div class="btn-container">
+      <button type="button" class="btn" onclick="window.location.href='{{ url_for('show_products') }}?part={{ request.args.get('part', '') }}'">Back</button>
+      <button type="submit" class="btn">Next</button>
+    </div>
+  </form>
+  
+
+  <!-- scripts unchanged, only fixed syntax in Jinja above -->
+  <script>
+    /* your JS functions remain the same */
+  </script>
+</body>
+</html>

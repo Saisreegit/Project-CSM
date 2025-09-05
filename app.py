@@ -1,21 +1,60 @@
 from flask import Flask, request, send_file, jsonify, render_template, session, redirect, url_for, flash
 from flask_cors import CORS
-from db import mysql, init_db
+from db import get_db
 import pandas as pd
 import os
 import tempfile
 from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries
-from werkzeug.security import check_password_hash
-from crms import create_app, db
+from werkzeug.security import check_password_hash, generate_password_hash
+from crms.routes import crms_bp, db, mail
+from fsrm.app import fsrm_bp
+from dotenv import load_dotenv
+from pathlib import Path
 
-app = create_app()
+# ----------------------------
+# 🔁 Load .env files
+# ----------------------------
+
+# 1. Load Project-level .env (Project-CSM/.env)
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
+
+# 2. Load CRMS-level .env (Project-CSM/crms/.env) — will override if same key exists
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / "crms" / ".env")
+
+
+
 app = Flask(__name__)
-init_db(app)
 CORS(app)
 
-app.secret_key = 'your_secret_key'  # Replace with a strong secret key
+app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
+# Get from .env (don't hardcode)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
+    "SQLALCHEMY_DATABASE_URI",
+    "mysql+pymysql://root:root123@localhost:3307/crms_db"
+)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# ----------------------------
+# ✅ Mail Configuration
+# ----------------------------
+app.config['MAIL_SERVER'] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+app.config['MAIL_PORT'] = int(os.getenv("MAIL_PORT", 587))
+app.config['MAIL_USE_TLS'] = os.getenv("MAIL_USE_TLS", "true").lower() == "true"
+app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
+app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv("MAIL_DEFAULT_SENDER")
+
+# Debug (Optional)
+# print("MAIL_USERNAME:", app.config['MAIL_USERNAME'])
+# print("MAIL_DEFAULT_SENDER:", app.config['MAIL_DEFAULT_SENDER'])
+
+db.init_app(app)
+mail.init_app(app)
+
+app.register_blueprint(crms_bp, url_prefix='/crms')
+app.register_blueprint(fsrm_bp, url_prefix='/fsrm')
 
 # Dummy credentials (you can later link this to your DB)
 USERNAME = 'admin'
@@ -23,38 +62,43 @@ PASSWORD = 'password123'
 
 UPLOAD_FOLDER = tempfile.gettempdir()
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 excel_data = {}  # Cache for uploaded Excel files
 
 # ------------------ Helpers ---------------------------
+def get_projects_for_user(user_id):
+    cur = get_db().cursor()
+    cur.execute("SELECT id, name FROM projects WHERE assigned_user_id = %s", (user_id,))
+    result = cur.fetchall()
+    cur.close()
+    return result
+
 def get_all_projects():
-    cur = mysql.connection.cursor()
+    cur = get_db().cursor()
     cur.execute("SELECT id, name FROM projects ORDER BY id")
     rows = cur.fetchall()           # list[(id, name)]
     cur.close()
     return rows
 
 def next_default_project_name():
-    cur = mysql.connection.cursor()
+    cur = get_db().cursor()
     cur.execute("SELECT COUNT(*) FROM projects")
     n = cur.fetchone()[0] + 1
     cur.close()
     return f"Project {n}"
 
 def get_admin_projects():                       # all projects
-    cur = mysql.connection.cursor()
+    cur = get_db().cursor()
     cur.execute("SELECT id, name FROM projects ORDER BY id")
     rows = cur.fetchall()
     cur.close()
     return rows
 
 def get_assigned_projects(user_id):             # only mine
-    cur = mysql.connection.cursor()
+    cur = get_db().cursor()
     cur.execute("SELECT id, name FROM projects WHERE owner_id = %s", (user_id,))
     rows = cur.fetchall()
     cur.close()
     return rows
-
 
 @app.route('/')
 def home():
@@ -62,8 +106,6 @@ def home():
         return redirect(url_for('index'))  # or your file upload route
     return redirect(url_for('login'))
 
-from flask import Flask, render_template, request, redirect, url_for, flash
-from werkzeug.security import generate_password_hash
 # other imports...
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -77,7 +119,7 @@ def register():
             flash('Username and password are required', 'danger')
             return redirect(url_for('register'))
 
-        cur = mysql.connection.cursor()
+        cur = get_db().cursor()
         cur.execute("SELECT id FROM users WHERE username = %s", (username,))
         if cur.fetchone():
             flash('Username already exists', 'warning')
@@ -87,7 +129,7 @@ def register():
         hashed_pw = generate_password_hash(password)
         cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
                     (username, hashed_pw, role))
-        mysql.connection.commit()
+        get_db().commit()
         cur.close()
 
         flash('Registration successful! Please log in.', 'success')
@@ -95,25 +137,24 @@ def register():
 
     return render_template('register.html')
 
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username']
         password_input = request.form['password']
 
-        cur = mysql.connection.cursor()
+        cur = get_db().cursor()
         cur.execute("SELECT id, password, role FROM users WHERE username = %s", (username,))
         user = cur.fetchone()
         cur.close()
 
-        if user and check_password_hash(user[1], password_input):
-            session['user_id'] = user[0]
+        if user and check_password_hash(user['password'], password_input):
+            session['user_id'] = user['id']
             session['username'] = username
-            session['role'] = user[2]
+            session['role'] = user['role']
             flash("Login successful!", "success")
 
-            if user[2] == 'admin':
+            if user['role'] == 'admin':
                 return redirect(url_for('dashboard'))
             else:
                 return redirect(url_for('user_dashboard'))
@@ -124,16 +165,20 @@ def login():
 
 @app.route('/user_dashboard')
 def user_dashboard():
-    if 'username' not in session or session['role'] != 'user':
+    if 'username' not in session:
         return redirect(url_for('login'))
-    
-    projects = get_assigned_projects(session['user_id'])
 
-    return render_template(
-        'user_dashboard.html',
-        username=session['username'],
-        projects=projects              # only projects owned by this user
-    )
+    user_id = session.get('user_id')
+    print("Logged-in User ID:", session.get('user_id'))
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM projects WHERE owner_id = %s", (user_id,))
+    projects = cur.fetchall()
+    cur.close()
+
+    projects = get_projects_for_user(user_id)  # Example function
+    return render_template("user_dashboard.html", username=session['username'], projects=projects)
 
 @app.route('/dashboard')
 def dashboard():
@@ -152,6 +197,34 @@ def dashboard():
         role='admin'
     )
 
+@app.route('/assign_project', methods=['GET', 'POST'])
+def assign_project():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    if request.method == 'POST':
+        try:
+            project_id = int(request.form.get('project_id'))
+            user_id = int(request.form.get('user_id'))
+            cur.execute("UPDATE projects SET owner_id = %s WHERE id = %s", (user_id, project_id))
+            conn.commit()
+            flash("✅ Project assigned successfully!")
+        except Exception as e:
+            flash(f"❌ Error: {e}")
+
+    cur.execute("SELECT id, name FROM projects")
+    projects = cur.fetchall()
+
+    cur.execute("SELECT id, username FROM users")
+    users = cur.fetchall()
+
+    cur.close()
+    return render_template("assign_project.html", projects=projects, users=users)
+
+
 @app.route('/add_project', methods=['GET', 'POST'])
 def add_project():
     if 'username' not in session:
@@ -161,7 +234,7 @@ def add_project():
         raw = request.form.get('project_name', '').strip()
         name = raw or next_default_project_name()
 
-        cur = mysql.connection.cursor()
+        cur = get_db().cursor()
         cur.execute("SELECT 1 FROM projects WHERE name=%s", (name,))
         if cur.fetchone():
             flash('Project name already exists', 'danger')
@@ -172,7 +245,7 @@ def add_project():
             "INSERT INTO projects (name, created_by) VALUES (%s, %s)",
             (name, session['user_id'])
         )
-        mysql.connection.commit()
+        get_db().commit()
         cur.close()
 
         flash(f'Project “{name}” added!', 'success')
@@ -306,6 +379,4 @@ def download():
     return jsonify({"error": "File not found"}), 404
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)

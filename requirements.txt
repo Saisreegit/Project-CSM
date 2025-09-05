@@ -4,3 +4,4 @@ flask-mysqldb
 pandas
 openpyxl
 flask-cors
+python-pptx

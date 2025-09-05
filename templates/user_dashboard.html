@@ -10,10 +10,10 @@
 
   {% if projects %}
     <div class="grid">
-      {% for pid, pname in projects %}
-        <a class="nav-btn" href="{{ url_for('work_products', project_id=pid) }}">
-          {{ pname }} ➜
-        </a>
+      {% for project in projects %}
+       <a class="nav-btn" href="{{ url_for('work_products', project_id=project.id) }}">
+        {{ project.name }}
+      </a>
       {% endfor %}
     </div>
   {% else %}

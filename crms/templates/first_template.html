@@ -96,10 +96,10 @@
         {% if message %}
             <div class="message">{{ message }}</div>
         {% endif %}
-
-        <form id="changeRequestForm" method="POST" action="/new-request">
+        <h1>Chipsafety</h1>
+        <form id="changeRequestForm" method="POST" action="{{ url_for('crms_bp.new_request') }}">
             <input type="hidden" name="action" id="formAction" value="Save">
-            <input type="hidden" name="change_request_id" value="{{ saved_data['Change Request ID'] or '' }}">
+            <input type="hidden" name="change_request_id" value="{{ saved_data.get('Change Request ID', '') }}">
             <table>
                 <tr>
                     <th>#</th>
@@ -136,7 +136,7 @@
             <div class="button-container">
                 <input type="submit" value="Save" onclick="submitForm('Save')">
                 <input type="button" value="Next" class="next" onclick="submitFormWithoutValidation()">
-                <a href="{{ url_for('auto_checklist', change_request_id=saved_data['Change Request ID']) }}">
+                <a href="{{ url_for('crms_bp.auto_checklist', change_request_id=saved_data['Change Request ID']) }}">
                     <input type="button" value="Checklist" style="background-color: #6c757d;" />
                 </a>
             </div>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Work Products</title>
+  <style>
+    body { font-family: Arial; background: #f2f2f2; padding: 20px; }
+    table { width: 95%; margin: auto; border-collapse: collapse; background: white; table-layout: auto; }
+    th, td { border: 1px solid #ccc; padding: 10px; vertical-align: top; word-wrap: break-word; }
+    th { background: #555; color: white; }
+    td:nth-child(3) { width: 30%; }
+    td:nth-child(6), th:nth-child(6) {
+  width: 250px; /* or adjust as needed */
+}
+
+    .btn { padding: 10px 20px; background: green; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    .other-details, .warning { display: none; }
+   .other-details {
+  width: 100%;
+  height: 120px;              /* fixed height */
+  overflow-y: auto;          /* scrollbar if content is longer */
+  resize: none;              /* prevent manual resize */
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-sizing: border-box;
+  display: inline-block;
+  font-family: Arial, sans-serif;
+}
+
+
+
+    select.rationale {
+        max-width: 300px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+  <h2 style="text-align:center;">Work Products</h2>
+  {% with msg = get_flashed_messages() %}
+    {% if msg %}<div style="color:green; text-align:center;">{{ msg[0] }}</div>{% endif %}
+  {% endwith %}
+  <form method="post" action="{{ url_for('next_page') }}?part={{ selected_part }}" onsubmit="return validateOtherDetails();">
+
+ <div style="display: flex; justify-content: flex-end; margin-bottom: 10px; margin-right: 40px;">
+
+
+  <label for="partSelector" style="margin-right: 4px; align-self: center;"><strong>Filter by Part:</strong></label>
+  <select id="partSelector" onchange="window.location='/?part=' + this.value" style="width: 200px;">
+
+    <option value="">-- Show All --</option>
+   {% for part in parts %}
+  <option value="{{ part.id }}" {% if selected_part == part.id %}selected{% endif %}>
+    {{ part.id }} – {{ part.name }}
+  </option>
+{% endfor %}
+
+  </select>
+</div>
+
+
+
+    <table>
+      <tr><th>ID</th><th>Name</th><th>Description</th><th>Tailored</th><th>Rationale</th><th>Other</th></tr>
+     
+     {% for item in work_products %}
+  {% set idx = item.id %}
+  {% if idx.startswith('part') %}
+<tr><td colspan="6" style="background:#ddd; font-weight:bold;">{{ item.id }} – {{ item.name }}</td></tr>
+
+  {% else %}
+    {% set saved = saved_data.get(idx, {}) %}
+    <tr>
+      <td>{{ idx }}</td>
+      <td>{{ item.name }}</td>
+      <td>{{ item.description }}</td>
+      <td>
+        <select name="tailored_{{ idx }}" onchange="toggleRationale(this); autoSave('{{ idx }}');">
+          <option value="">Select</option>
+          <option value="No" {% if saved.get('tailored') == 'No' %}selected{% endif %}>No</option>
+          <option value="Yes" {% if saved.get('tailored') == 'Yes' %}selected{% endif %}>Yes</option>
+        </select>
+      </td>
+      <td>
+        <select name="rationale_{{ idx }}" class="rationale" onchange="toggleOther(this); autoSave('{{ idx }}');"
+          {% if saved.get('tailored') != 'Yes' %}disabled style="display:none;"{% endif %}>
+          <option value="">Select</option>
+          <option value="The QMS is a formalized system that documents processes, procedures, and responsibilities for achieving quality policies and objectives."
+            title="The QMS is a formalized system that documents processes, procedures, and responsibilities for achieving quality policies and objectives."
+            {% if saved.get('rationale') == 'The QMS is a formalized system that documents processes, procedures, and responsibilities for achieving quality policies and objectives.' %}selected{% endif %}>
+            The QMS is a formalized system...
+          </option>
+          <option value="Other" {% if saved.get('rationale') == 'Other' %}selected{% endif %}>Other</option>
+        </select>
+      </td>
+      <td>
+        <textarea name="other_details_{{ idx }}" class="other-details" placeholder="Specify"
+          onchange="autoSave('{{ idx }}');"
+          {% if saved.get('rationale') != 'Other' %}disabled style="display:none;"{% endif %}>{{ saved.get('other', '') }}</textarea>
+        <div class="warning"⚠️ Required when 'Other' is selected.</div>
+      </td>
+    </tr>
+  {% endif %}
+{% endfor %}
+
+    </table>
+    <div style="text-align:center; margin-top: 20px;">
+      <button type="submit" class="btn">Next</button>
+    </div>
+  </form>
+<script>
+
+function toggleRationale(sel) {
+    const row = sel.closest('tr');
+    const rat = row.querySelector('.rationale');
+    const other = row.querySelector('.other-details');
+    const warn = row.querySelector('.warning');
+    if (sel.value === 'Yes') {
+        rat.style.display = 'inline-block'; rat.disabled = false;
+        if (rat.value === 'Other') {
+            other.style.display = 'inline-block'; other.disabled = false;
+            warn.style.display = other.value.trim() ? 'none' : 'block';
+        }
+    } else {
+        rat.style.display = 'none'; rat.disabled = true;
+        other.style.display = 'none'; other.disabled = true;
+        warn.style.display = 'none';
+    }
+}
+
+   function toggleOther(sel) {
+    const row = sel.closest('tr');
+    const other = row.querySelector('.other-details');
+    const warn = row.querySelector('.warning');
+
+    if (sel.value === 'Other') {
+        other.style.display = 'inline-block';
+        other.disabled = false;
+        other.value = '';  // 👈 Clear the textarea when 'Other' is selected
+        warn.style.display = other.value.trim() ? 'none' : 'block';
+    } else {
+        other.style.display = 'inline-block';
+        other.disabled = true;
+        other.value = sel.value;  // 👈 Show selected predefined rationale
+        warn.style.display = 'none';
+    }
+}
+
+function validateOtherDetails() {
+    let valid = true;
+
+    // Loop over all table rows
+    document.querySelectorAll("table tr").forEach(row => {
+        const tailored = row.querySelector("select[name^='tailored_']");
+        const rationale = row.querySelector("select[name^='rationale_']");
+        const otherInput = row.querySelector("textarea[name^='other_details_']");
+        const warning = row.querySelector(".warning");
+
+        // Check if Tailored field exists (skip header row)
+        if (tailored) {
+            if (tailored.value === "") {
+                tailored.style.border = "2px solid red";
+                valid = false;
+            } else {
+                tailored.style.border = "";
+            }
+
+            if (tailored.value === "Yes" && rationale) {
+                if (rationale.value === "") {
+                    rationale.style.border = "2px solid red";
+                    valid = false;
+                } else {
+                    rationale.style.border = "";
+                }
+
+                if (rationale.value === "Other") {
+                    if (!otherInput.value.trim()) {
+                        warning.style.display = 'block';
+                        otherInput.style.border = "2px solid red";
+                        valid = false;
+                    } else {
+                        warning.style.display = 'none';
+                        otherInput.style.border = "";
+                    }
+                }
+            }
+        }
+    });
+
+    if (!valid) {
+        alert("Please fill all required fields before proceeding.");
+    }
+
+    return valid;
+}
+
+
+
+function autoSave(idx) {
+    const tailored = document.querySelector(`[name="tailored_${idx}"]`)?.value || "";
+    const rationale = document.querySelector(`[name="rationale_${idx}"]`)?.value || "";
+    const other = document.querySelector(`[name="other_details_${idx}"]`)?.value || "";
+    fetch("/autosave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idx, tailored, rationale, other })
+    });
+}
+window.onload = function() {
+    // Initialize rationale visibility based on tailored selection
+    document.querySelectorAll("select[name^='tailored_']").forEach(function(sel) {
+        toggleRationale(sel);
+    });
+    // Initialize other-details visibility based on rationale selection
+    document.querySelectorAll("select.rationale").forEach(function(sel) {
+        toggleOther(sel);
+    });
+};
+
+</script>
+<script>
+function filterByPart() {
+    const selectedPart = document.getElementById("partSelector").value;
+    const rows = document.querySelectorAll("table tr");
+
+    let show = true;
+    rows.forEach((row, index) => {
+        if (index === 0) return; // skip header row
+
+        if (row.cells.length === 1 && row.cells[0].colSpan === 6) {
+            // Section header row (e.g., part 2)
+            show = !selectedPart || row.textContent.trim().startsWith(selectedPart);
+            row.style.display = show ? "" : "none";
+        } else {
+            row.style.display = show ? "" : "none";
+        }
+    });
+}
+</script>
+
+</body>
+</html>

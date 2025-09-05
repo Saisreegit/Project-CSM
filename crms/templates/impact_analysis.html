@@ -81,7 +81,7 @@
         {% if message %}
             <div class="message">{{ message }}</div>
         {% endif %}
-        <form id="ImpactAnalysisForm" method="POST" action="/impact-analysis">
+        <form id="ImpactAnalysisForm" method="POST" action="{{ url_for('crms_bp.impact_analysis') }}" enctype="multipart/form-data">
             <input type="hidden" name="change_request_id" value="{{ impact.change_request_id if impact else '' }}">
             
             <table>
@@ -156,10 +156,10 @@
 </div>
 
     <div class="button-container">
-        <a href="{{ url_for('save_next') }}?change_request_id={{ impact.change_request_id }}" class="button-style small-button">Previous</a>
+        <a href="{{ url_for('crms_bp.save_next', change_request_id=impact.change_request_id) }}" class="button-style small-button">Previous</a>
         <input type="submit" name="save_form" value="Save">
         <input type="submit" name="next_form" value="Next">
-        <a href="{{ url_for('auto_checklist', change_request_id=impact.change_request_id) }}">
+        <a href="{{ url_for('crms_bp.auto_checklist', change_request_id=impact.change_request_id) }}">
             <button type="button" style="margin-top: 30px;">Checklist</button>
         </a>
     </div>
